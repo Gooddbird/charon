@@ -1,0 +1,1 @@
+/usr/bin/c++   -rdynamic -O3 -g -std=c++11 -lpthread -Wall -Wno-deprecated -Werror -Wno-dev -Wno-unused-function  -rdynamic CMakeFiles/test_coroutine.dir/tests/test_coroutine.cc.o  -o ../bin/test_coroutine -Wl,-rpath,/home/hd/workspace/charon/lib ../lib/libcharon.so 

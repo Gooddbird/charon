@@ -1,0 +1,42 @@
+2020-02-10 03:55:04	28606	UNKNOW	0	[INFO]	[root]	/home/hd/workspace/charon/tests/test_scheduler.cc:19	test begin
+2020-02-10 03:55:04	28607	name_0	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:57	Scheduler SCHE  run
+2020-02-10 03:55:04	28607	name_0	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:31	Coroutine::Coroutine()   MainCoroutine, id=0
+2020-02-10 03:55:04	28607	name_0	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:46	Coroutine::Coroutine(), and id=1
+2020-02-10 03:55:04	28608	name_1	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:57	Scheduler SCHE  run
+2020-02-10 03:55:04	28608	name_1	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:31	Coroutine::Coroutine()   MainCoroutine, id=0
+2020-02-10 03:55:04	28608	name_1	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:46	Coroutine::Coroutine(), and id=2
+2020-02-10 03:55:04	28609	name_2	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:57	Scheduler SCHE  run
+2020-02-10 03:55:04	28609	name_2	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:31	Coroutine::Coroutine()   MainCoroutine, id=0
+2020-02-10 03:55:04	28609	name_2	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:46	Coroutine::Coroutine(), and id=3
+2020-02-10 03:55:04	28610	name_3	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:57	Scheduler SCHE  run
+2020-02-10 03:55:04	28610	name_3	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:31	Coroutine::Coroutine()   MainCoroutine, id=0
+2020-02-10 03:55:04	28610	name_3	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:46	Coroutine::Coroutine(), and id=4
+2020-02-10 03:55:04	28611	name_4	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:57	Scheduler SCHE  run
+2020-02-10 03:55:04	28611	name_4	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:31	Coroutine::Coroutine()   MainCoroutine, id=0
+2020-02-10 03:55:04	28611	name_4	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:46	Coroutine::Coroutine(), and id=5
+2020-02-10 03:55:04	28607	name_0	1	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:162	idle begin
+2020-02-10 03:55:04	28608	name_1	2	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:162	idle begin
+2020-02-10 03:55:04	28609	name_2	3	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:162	idle begin
+2020-02-10 03:55:04	28611	name_4	5	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:162	idle begin
+2020-02-10 03:55:04	28610	name_3	4	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:162	idle begin
+2020-02-10 03:55:06	28608	name_1	2	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:166	idle end
+2020-02-10 03:55:06	28608	name_1	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:100	ilde stop
+2020-02-10 03:55:06	28608	name_1	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=2, current CoroutineCounts=9
+2020-02-10 03:55:06	28608	name_1	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=0, current CoroutineCounts=8
+2020-02-10 03:55:06	28607	name_0	1	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:166	idle end
+2020-02-10 03:55:06	28607	name_0	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:100	ilde stop
+2020-02-10 03:55:06	28607	name_0	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=1, current CoroutineCounts=7
+2020-02-10 03:55:06	28607	name_0	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=0, current CoroutineCounts=6
+2020-02-10 03:55:06	28611	name_4	5	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:166	idle end
+2020-02-10 03:55:06	28611	name_4	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:100	ilde stop
+2020-02-10 03:55:06	28611	name_4	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=5, current CoroutineCounts=5
+2020-02-10 03:55:06	28611	name_4	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=0, current CoroutineCounts=4
+2020-02-10 03:55:06	28609	name_2	3	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:166	idle end
+2020-02-10 03:55:06	28609	name_2	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:100	ilde stop
+2020-02-10 03:55:06	28609	name_2	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=3, current CoroutineCounts=3
+2020-02-10 03:55:06	28609	name_2	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=0, current CoroutineCounts=2
+2020-02-10 03:55:06	28610	name_3	4	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:166	idle end
+2020-02-10 03:55:06	28610	name_3	0	[INFO]	[root]	/home/hd/workspace/charon/charon/scheduler.cc:100	ilde stop
+2020-02-10 03:55:06	28610	name_3	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=4, current CoroutineCounts=1
+2020-02-10 03:55:06	28610	name_3	0	[DEBUG]	[root]	/home/hd/workspace/charon/charon/coroutine.cc:61	Coroutine::~Coroutine(), and id=0, current CoroutineCounts=0
+2020-02-10 03:55:06	28606	UNKNOW	0	[INFO]	[root]	/home/hd/workspace/charon/tests/test_scheduler.cc:31	test end

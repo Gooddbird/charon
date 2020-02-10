@@ -1,0 +1,8 @@
+/home/hd/workspace/charon/build/CMakeFiles/test_io_scheduler.dir
+/home/hd/workspace/charon/build/CMakeFiles/edit_cache.dir
+/home/hd/workspace/charon/build/CMakeFiles/test_log.dir
+/home/hd/workspace/charon/build/CMakeFiles/test_coroutine.dir
+/home/hd/workspace/charon/build/CMakeFiles/charon.dir
+/home/hd/workspace/charon/build/CMakeFiles/test_thread.dir
+/home/hd/workspace/charon/build/CMakeFiles/rebuild_cache.dir
+/home/hd/workspace/charon/build/CMakeFiles/test_scheduler.dir
