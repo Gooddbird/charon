@@ -1,0 +1,42 @@
+syntax = "proto3";
+option cc_generic_services = true;
+
+message DiscoverTag {
+  int32 tag1 = 1;
+  int32 tag2 = 2;
+  int32 tag3 = 3;
+};
+
+message DiscoverRequest {
+  string server_name = 1;
+  DiscoverTag tag = 2;
+};
+
+message DiscoverResponse {
+  int32 ret_code = 1;
+  string res_info = 2;
+  string server_name = 3;
+  DiscoverTag tag = 4;
+  // ip:port
+  string addr = 5;
+};
+
+message RegisterRequest {
+  string server_name = 1;
+  string addr = 2;
+  DiscoverTag tag = 3;
+};
+
+message RegisterResponse {
+  int32 ret_code = 1;
+  string res_info = 2;
+};
+
+
+service CharonService {
+  // discover server addr
+  rpc DiscoverServer(DiscoverRequest) returns (DiscoverResponse);
+
+  // rpc method name
+  rpc RegisterServer(RegisterRequest) returns (RegisterResponse);
+}
