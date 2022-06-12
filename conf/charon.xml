@@ -30,7 +30,8 @@
   <!--max time when call connect, s-->
   <max_connect_timeout>75</max_connect_timeout>
 
-  <!--count of io threads, at least 1-->
+  <!--don't change this value !!!-->
+  <!--charon only support single io thread-->
   <iothread_num>1</iothread_num>
 
   <time_wheel>
