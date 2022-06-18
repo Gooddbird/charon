@@ -193,31 +193,46 @@ class DiscoverTag final :
     kTag2FieldNumber = 2,
     kTag3FieldNumber = 3,
   };
-  // int32 tag1 = 1;
+  // string tag1 = 1;
   void clear_tag1();
-  int32_t tag1() const;
-  void set_tag1(int32_t value);
+  const std::string& tag1() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_tag1(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_tag1();
+  PROTOBUF_NODISCARD std::string* release_tag1();
+  void set_allocated_tag1(std::string* tag1);
   private:
-  int32_t _internal_tag1() const;
-  void _internal_set_tag1(int32_t value);
+  const std::string& _internal_tag1() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_tag1(const std::string& value);
+  std::string* _internal_mutable_tag1();
   public:
 
-  // int32 tag2 = 2;
+  // string tag2 = 2;
   void clear_tag2();
-  int32_t tag2() const;
-  void set_tag2(int32_t value);
+  const std::string& tag2() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_tag2(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_tag2();
+  PROTOBUF_NODISCARD std::string* release_tag2();
+  void set_allocated_tag2(std::string* tag2);
   private:
-  int32_t _internal_tag2() const;
-  void _internal_set_tag2(int32_t value);
+  const std::string& _internal_tag2() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_tag2(const std::string& value);
+  std::string* _internal_mutable_tag2();
   public:
 
-  // int32 tag3 = 3;
+  // string tag3 = 3;
   void clear_tag3();
-  int32_t tag3() const;
-  void set_tag3(int32_t value);
+  const std::string& tag3() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_tag3(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_tag3();
+  PROTOBUF_NODISCARD std::string* release_tag3();
+  void set_allocated_tag3(std::string* tag3);
   private:
-  int32_t _internal_tag3() const;
-  void _internal_set_tag3(int32_t value);
+  const std::string& _internal_tag3() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_tag3(const std::string& value);
+  std::string* _internal_mutable_tag3();
   public:
 
   // @@protoc_insertion_point(class_scope:DiscoverTag)
@@ -227,9 +242,9 @@ class DiscoverTag final :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
-  int32_t tag1_;
-  int32_t tag2_;
-  int32_t tag3_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr tag1_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr tag2_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr tag3_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_charon_2eproto;
 };
@@ -1033,64 +1048,154 @@ class CharonService_Stub : public CharonService {
 #endif  // __GNUC__
 // DiscoverTag
 
-// int32 tag1 = 1;
+// string tag1 = 1;
 inline void DiscoverTag::clear_tag1() {
-  tag1_ = 0;
+  tag1_.ClearToEmpty();
 }
-inline int32_t DiscoverTag::_internal_tag1() const {
-  return tag1_;
-}
-inline int32_t DiscoverTag::tag1() const {
+inline const std::string& DiscoverTag::tag1() const {
   // @@protoc_insertion_point(field_get:DiscoverTag.tag1)
   return _internal_tag1();
 }
-inline void DiscoverTag::_internal_set_tag1(int32_t value) {
-  
-  tag1_ = value;
-}
-inline void DiscoverTag::set_tag1(int32_t value) {
-  _internal_set_tag1(value);
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void DiscoverTag::set_tag1(ArgT0&& arg0, ArgT... args) {
+ 
+ tag1_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
   // @@protoc_insertion_point(field_set:DiscoverTag.tag1)
 }
+inline std::string* DiscoverTag::mutable_tag1() {
+  std::string* _s = _internal_mutable_tag1();
+  // @@protoc_insertion_point(field_mutable:DiscoverTag.tag1)
+  return _s;
+}
+inline const std::string& DiscoverTag::_internal_tag1() const {
+  return tag1_.Get();
+}
+inline void DiscoverTag::_internal_set_tag1(const std::string& value) {
+  
+  tag1_.Set(value, GetArenaForAllocation());
+}
+inline std::string* DiscoverTag::_internal_mutable_tag1() {
+  
+  return tag1_.Mutable(GetArenaForAllocation());
+}
+inline std::string* DiscoverTag::release_tag1() {
+  // @@protoc_insertion_point(field_release:DiscoverTag.tag1)
+  return tag1_.Release();
+}
+inline void DiscoverTag::set_allocated_tag1(std::string* tag1) {
+  if (tag1 != nullptr) {
+    
+  } else {
+    
+  }
+  tag1_.SetAllocated(tag1, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (tag1_.IsDefault()) {
+    tag1_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:DiscoverTag.tag1)
+}
 
-// int32 tag2 = 2;
+// string tag2 = 2;
 inline void DiscoverTag::clear_tag2() {
-  tag2_ = 0;
+  tag2_.ClearToEmpty();
 }
-inline int32_t DiscoverTag::_internal_tag2() const {
-  return tag2_;
-}
-inline int32_t DiscoverTag::tag2() const {
+inline const std::string& DiscoverTag::tag2() const {
   // @@protoc_insertion_point(field_get:DiscoverTag.tag2)
   return _internal_tag2();
 }
-inline void DiscoverTag::_internal_set_tag2(int32_t value) {
-  
-  tag2_ = value;
-}
-inline void DiscoverTag::set_tag2(int32_t value) {
-  _internal_set_tag2(value);
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void DiscoverTag::set_tag2(ArgT0&& arg0, ArgT... args) {
+ 
+ tag2_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
   // @@protoc_insertion_point(field_set:DiscoverTag.tag2)
 }
+inline std::string* DiscoverTag::mutable_tag2() {
+  std::string* _s = _internal_mutable_tag2();
+  // @@protoc_insertion_point(field_mutable:DiscoverTag.tag2)
+  return _s;
+}
+inline const std::string& DiscoverTag::_internal_tag2() const {
+  return tag2_.Get();
+}
+inline void DiscoverTag::_internal_set_tag2(const std::string& value) {
+  
+  tag2_.Set(value, GetArenaForAllocation());
+}
+inline std::string* DiscoverTag::_internal_mutable_tag2() {
+  
+  return tag2_.Mutable(GetArenaForAllocation());
+}
+inline std::string* DiscoverTag::release_tag2() {
+  // @@protoc_insertion_point(field_release:DiscoverTag.tag2)
+  return tag2_.Release();
+}
+inline void DiscoverTag::set_allocated_tag2(std::string* tag2) {
+  if (tag2 != nullptr) {
+    
+  } else {
+    
+  }
+  tag2_.SetAllocated(tag2, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (tag2_.IsDefault()) {
+    tag2_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:DiscoverTag.tag2)
+}
 
-// int32 tag3 = 3;
+// string tag3 = 3;
 inline void DiscoverTag::clear_tag3() {
-  tag3_ = 0;
+  tag3_.ClearToEmpty();
 }
-inline int32_t DiscoverTag::_internal_tag3() const {
-  return tag3_;
-}
-inline int32_t DiscoverTag::tag3() const {
+inline const std::string& DiscoverTag::tag3() const {
   // @@protoc_insertion_point(field_get:DiscoverTag.tag3)
   return _internal_tag3();
 }
-inline void DiscoverTag::_internal_set_tag3(int32_t value) {
-  
-  tag3_ = value;
-}
-inline void DiscoverTag::set_tag3(int32_t value) {
-  _internal_set_tag3(value);
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void DiscoverTag::set_tag3(ArgT0&& arg0, ArgT... args) {
+ 
+ tag3_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
   // @@protoc_insertion_point(field_set:DiscoverTag.tag3)
+}
+inline std::string* DiscoverTag::mutable_tag3() {
+  std::string* _s = _internal_mutable_tag3();
+  // @@protoc_insertion_point(field_mutable:DiscoverTag.tag3)
+  return _s;
+}
+inline const std::string& DiscoverTag::_internal_tag3() const {
+  return tag3_.Get();
+}
+inline void DiscoverTag::_internal_set_tag3(const std::string& value) {
+  
+  tag3_.Set(value, GetArenaForAllocation());
+}
+inline std::string* DiscoverTag::_internal_mutable_tag3() {
+  
+  return tag3_.Mutable(GetArenaForAllocation());
+}
+inline std::string* DiscoverTag::release_tag3() {
+  // @@protoc_insertion_point(field_release:DiscoverTag.tag3)
+  return tag3_.Release();
+}
+inline void DiscoverTag::set_allocated_tag3(std::string* tag3) {
+  if (tag3 != nullptr) {
+    
+  } else {
+    
+  }
+  tag3_.SetAllocated(tag3, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (tag3_.IsDefault()) {
+    tag3_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:DiscoverTag.tag3)
 }
 
 // -------------------------------------------------------------------

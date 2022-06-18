@@ -22,9 +22,9 @@ namespace _pbi = _pb::internal;
 
 PROTOBUF_CONSTEXPR DiscoverTag::DiscoverTag(
     ::_pbi::ConstantInitialized)
-  : tag1_(0)
-  , tag2_(0)
-  , tag3_(0){}
+  : tag1_(&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{})
+  , tag2_(&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{})
+  , tag3_(&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}){}
 struct DiscoverTagDefaultTypeInternal {
   PROTOBUF_CONSTEXPR DiscoverTagDefaultTypeInternal()
       : _instance(::_pbi::ConstantInitialized{}) {}
@@ -159,7 +159,7 @@ static const ::_pb::Message* const file_default_instances[] = {
 
 const char descriptor_table_protodef_charon_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
   "\n\014charon.proto\"7\n\013DiscoverTag\022\014\n\004tag1\030\001 "
-  "\001(\005\022\014\n\004tag2\030\002 \001(\005\022\014\n\004tag3\030\003 \001(\005\"A\n\017Disco"
+  "\001(\t\022\014\n\004tag2\030\002 \001(\t\022\014\n\004tag3\030\003 \001(\t\"A\n\017Disco"
   "verRequest\022\023\n\013server_name\030\001 \001(\t\022\031\n\003tag\030\002"
   " \001(\0132\014.DiscoverTag\"t\n\020DiscoverResponse\022\020"
   "\n\010ret_code\030\001 \001(\005\022\020\n\010res_info\030\002 \001(\t\022\023\n\013se"
@@ -204,17 +204,46 @@ DiscoverTag::DiscoverTag(::PROTOBUF_NAMESPACE_ID::Arena* arena,
 DiscoverTag::DiscoverTag(const DiscoverTag& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  ::memcpy(&tag1_, &from.tag1_,
-    static_cast<size_t>(reinterpret_cast<char*>(&tag3_) -
-    reinterpret_cast<char*>(&tag1_)) + sizeof(tag3_));
+  tag1_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    tag1_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_tag1().empty()) {
+    tag1_.Set(from._internal_tag1(), 
+      GetArenaForAllocation());
+  }
+  tag2_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    tag2_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_tag2().empty()) {
+    tag2_.Set(from._internal_tag2(), 
+      GetArenaForAllocation());
+  }
+  tag3_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    tag3_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_tag3().empty()) {
+    tag3_.Set(from._internal_tag3(), 
+      GetArenaForAllocation());
+  }
   // @@protoc_insertion_point(copy_constructor:DiscoverTag)
 }
 
 inline void DiscoverTag::SharedCtor() {
-::memset(reinterpret_cast<char*>(this) + static_cast<size_t>(
-    reinterpret_cast<char*>(&tag1_) - reinterpret_cast<char*>(this)),
-    0, static_cast<size_t>(reinterpret_cast<char*>(&tag3_) -
-    reinterpret_cast<char*>(&tag1_)) + sizeof(tag3_));
+tag1_.InitDefault();
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  tag1_.Set("", GetArenaForAllocation());
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+tag2_.InitDefault();
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  tag2_.Set("", GetArenaForAllocation());
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+tag3_.InitDefault();
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  tag3_.Set("", GetArenaForAllocation());
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 DiscoverTag::~DiscoverTag() {
@@ -228,6 +257,9 @@ DiscoverTag::~DiscoverTag() {
 
 inline void DiscoverTag::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  tag1_.Destroy();
+  tag2_.Destroy();
+  tag3_.Destroy();
 }
 
 void DiscoverTag::SetCachedSize(int size) const {
@@ -240,9 +272,9 @@ void DiscoverTag::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  ::memset(&tag1_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&tag3_) -
-      reinterpret_cast<char*>(&tag1_)) + sizeof(tag3_));
+  tag1_.ClearToEmpty();
+  tag2_.ClearToEmpty();
+  tag3_.ClearToEmpty();
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -252,27 +284,33 @@ const char* DiscoverTag::_InternalParse(const char* ptr, ::_pbi::ParseContext* c
     uint32_t tag;
     ptr = ::_pbi::ReadTag(ptr, &tag);
     switch (tag >> 3) {
-      // int32 tag1 = 1;
+      // string tag1 = 1;
       case 1:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
-          tag1_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+          auto str = _internal_mutable_tag1();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "DiscoverTag.tag1"));
         } else
           goto handle_unusual;
         continue;
-      // int32 tag2 = 2;
+      // string tag2 = 2;
       case 2:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
-          tag2_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_tag2();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "DiscoverTag.tag2"));
         } else
           goto handle_unusual;
         continue;
-      // int32 tag3 = 3;
+      // string tag3 = 3;
       case 3:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
-          tag3_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
+          auto str = _internal_mutable_tag3();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "DiscoverTag.tag3"));
         } else
           goto handle_unusual;
         continue;
@@ -305,22 +343,34 @@ uint8_t* DiscoverTag::_InternalSerialize(
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  // int32 tag1 = 1;
-  if (this->_internal_tag1() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(1, this->_internal_tag1(), target);
+  // string tag1 = 1;
+  if (!this->_internal_tag1().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_tag1().data(), static_cast<int>(this->_internal_tag1().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "DiscoverTag.tag1");
+    target = stream->WriteStringMaybeAliased(
+        1, this->_internal_tag1(), target);
   }
 
-  // int32 tag2 = 2;
-  if (this->_internal_tag2() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(2, this->_internal_tag2(), target);
+  // string tag2 = 2;
+  if (!this->_internal_tag2().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_tag2().data(), static_cast<int>(this->_internal_tag2().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "DiscoverTag.tag2");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_tag2(), target);
   }
 
-  // int32 tag3 = 3;
-  if (this->_internal_tag3() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_tag3(), target);
+  // string tag3 = 3;
+  if (!this->_internal_tag3().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_tag3().data(), static_cast<int>(this->_internal_tag3().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "DiscoverTag.tag3");
+    target = stream->WriteStringMaybeAliased(
+        3, this->_internal_tag3(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
@@ -339,19 +389,25 @@ size_t DiscoverTag::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  // int32 tag1 = 1;
-  if (this->_internal_tag1() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_tag1());
+  // string tag1 = 1;
+  if (!this->_internal_tag1().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_tag1());
   }
 
-  // int32 tag2 = 2;
-  if (this->_internal_tag2() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_tag2());
+  // string tag2 = 2;
+  if (!this->_internal_tag2().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_tag2());
   }
 
-  // int32 tag3 = 3;
-  if (this->_internal_tag3() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_tag3());
+  // string tag3 = 3;
+  if (!this->_internal_tag3().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_tag3());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
@@ -376,13 +432,13 @@ void DiscoverTag::MergeFrom(const DiscoverTag& from) {
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (from._internal_tag1() != 0) {
+  if (!from._internal_tag1().empty()) {
     _internal_set_tag1(from._internal_tag1());
   }
-  if (from._internal_tag2() != 0) {
+  if (!from._internal_tag2().empty()) {
     _internal_set_tag2(from._internal_tag2());
   }
-  if (from._internal_tag3() != 0) {
+  if (!from._internal_tag3().empty()) {
     _internal_set_tag3(from._internal_tag3());
   }
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -401,13 +457,21 @@ bool DiscoverTag::IsInitialized() const {
 
 void DiscoverTag::InternalSwap(DiscoverTag* other) {
   using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(DiscoverTag, tag3_)
-      + sizeof(DiscoverTag::tag3_)
-      - PROTOBUF_FIELD_OFFSET(DiscoverTag, tag1_)>(
-          reinterpret_cast<char*>(&tag1_),
-          reinterpret_cast<char*>(&other->tag1_));
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &tag1_, lhs_arena,
+      &other->tag1_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &tag2_, lhs_arena,
+      &other->tag2_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &tag3_, lhs_arena,
+      &other->tag3_, rhs_arena
+  );
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata DiscoverTag::GetMetadata() const {

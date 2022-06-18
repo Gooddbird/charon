@@ -2,9 +2,9 @@ syntax = "proto3";
 option cc_generic_services = true;
 
 message DiscoverTag {
-  int32 tag1 = 1;
-  int32 tag2 = 2;
-  int32 tag3 = 3;
+  string tag1 = 1;
+  string tag2 = 2;
+  string tag3 = 3;
 };
 
 message DiscoverRequest {
