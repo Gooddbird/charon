@@ -6,7 +6,7 @@ PATH_BIN = ../bin
 PATH_SERVICE = server/service
 PATH_INTERFACE = server/interface
 PATH_DATA = server/data
-PATH_COMM = comm 
+PATH_COMM = comm
 PATH_PB = pb
 PATH_TINYRPC = ../../tinyrpc
 

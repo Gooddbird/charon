@@ -19,6 +19,8 @@ message DiscoverResponse {
   DiscoverTag tag = 4;
   // ip:port
   string addr = 5;
+  string ip = 6;
+  int32 port = 7;
 };
 
 message RegisterRequest {

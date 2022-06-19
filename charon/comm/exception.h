@@ -7,21 +7,14 @@ namespace charon {
 class CharonException : public std::exception {
  public:
 
-  CharonException(long long code, const std::string& errinfo) : m_error_code(code), m_error_info(errinfo) {}
+  CharonException(long long code, const std::string& errinfo);
+  ~CharonException();
 
-  ~CharonException() {}
+  const char* what();
 
-  const char* what() {
-    return m_error_info.c_str();
-  }
+  std::string error();
 
-  std::string error() {
-    return m_error_info;
-  }
-
-  long long code() {
-    return m_error_code;
-  }
+  long long code();
 
  private:
   long long m_error_code = 0;

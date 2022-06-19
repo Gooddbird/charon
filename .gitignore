@@ -2,3 +2,5 @@ bin/*
 log/*
 *.pb.h
 *.pb.cc
+*.o
+*.a
