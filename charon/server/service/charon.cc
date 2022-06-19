@@ -2,13 +2,16 @@
 #include <exception>
 #include "charon/server/service/charon.h"
 #include "charon/server/interface/discover_server.h"
+#include "charon/server/interface/register_server.h"
 #include "charon/comm/exception.h"
 #include "tinyrpc/comm/log.h"
 
 #define CALL_CHARON_INTERFACE(type) \
-  type impl; \
+  type impl(request, response); \
+  response->set_ret_code(0); \
+  response->set_res_info("OK"); \
   try { \
-    impl.run(request, response); \
+    impl.run(); \
   } catch (charon::CharonException& e) { \
     AppErrorLog << "occur CharonException, error code = " << e.code() << ", errinfo = " << e.error(); \
     response->set_ret_code(e.code()); \
@@ -41,7 +44,7 @@ void Charon::RegisterServer(::google::protobuf::RpcController* controller,
                       ::RegisterResponse* response,
                       ::google::protobuf::Closure* done) {
 
-
+  CALL_CHARON_INTERFACE(RegisterServerImpl);
 }
 
 

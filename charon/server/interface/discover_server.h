@@ -2,30 +2,26 @@
 #define CHARON_SERVER_INTERFACE_DISCOVER_SERVER_H
 
 #include "charon/pb/charon.pb.h"
+#include "tinyrpc/comm/string_util.h"
 
 namespace charon {
 
 class DiscoverServerImpl {
  public:
-  DiscoverServerImpl() = default;
+  DiscoverServerImpl(const DiscoverRequest* request, DiscoverResponse* response);
 
-  ~DiscoverServerImpl() = default;
+  ~DiscoverServerImpl();
 
-  void run(const DiscoverRequest* request, DiscoverResponse* response);
+  void run();
 
-  std::string findAddrByTag(const std::string& tag, std::string& re_tag);
+  void checkInput();
 
-  std::string getAddrFromSingleValue(const std::string& value, std::string& tag);
-
-  std::string genTagString(const DiscoverTag& tag);
-
-  DiscoverTag genDiscoverTag(const std::string& tag_str);
-
-  std::string getTagByIndex(const std::string& tag_str, int index = 1);
-
-  bool checkIPAddr(const std::string& addr, std::string& ip, int& port);
+  void execute();
 
  private:
+  const DiscoverRequest* m_request {NULL};
+  DiscoverResponse* m_response {NULL};
+
   std::string m_addr_value;
 
 };
