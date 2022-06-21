@@ -15,18 +15,15 @@ DataContainer::~DataContainer() {
 
 }
 
-bool DataContainer::getValue(const std::string& key, std::string& value) {
+Node* DataContainer::getNode(const std::string& key) {
   auto it = m_db.find(key);
   if (it != m_db.end()) {
-    if (it->second.is_able) {
-      value = it->second.value;
-      return true;
-    }
+    return NULL;
   }
-  return false;
+  return &(it->second);
 }
   
-void DataContainer::setValue(const std::string& key, const std::string& value, int64_t expire_time /*=0*/) {
+void DataContainer::setNode(const std::string& key, const std::string& value, int64_t expire_time /*=0*/) {
   Node node;
   node.value = value;
   node.expire_time = expire_time;

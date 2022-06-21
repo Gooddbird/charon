@@ -53,8 +53,9 @@ void DiscoverServerImpl::execute() {
 
   std::string tagstr = ServerAddrUtil::GetTagString(m_request->tag());
   std::string res_tag_str;
+  DiscoverTag res_tag;
 
-  std::string addr = ServerAddrUtil::GetAddrByTag(m_addr_value, tagstr, res_tag_str);
+  std::string addr = ServerAddrUtil::GetAddrByTag(m_addr_value, m_request->tag(), res_tag);
   if (addr.empty()) {
     throw CharonException(ERROR_SERVER_ADDR_EMPTY, "faild to discover server, server don't have able addr");
   }
@@ -68,9 +69,9 @@ void DiscoverServerImpl::execute() {
   m_response->set_addr(addr);
   m_response->set_ip(ip);
   m_response->set_port(port);
-  m_response->mutable_tag()->set_tag1(ServerAddrUtil::GetTagByIndex(res_tag_str, 1));
-  m_response->mutable_tag()->set_tag2(ServerAddrUtil::GetTagByIndex(res_tag_str, 2));
-  m_response->mutable_tag()->set_tag3(ServerAddrUtil::GetTagByIndex(res_tag_str, 3));
+  m_response->mutable_tag()->set_tag1(res_tag.tag1());
+  m_response->mutable_tag()->set_tag2(res_tag.tag2());
+  m_response->mutable_tag()->set_tag3(res_tag.tag3());
 
   AppInfoLog << "discover server success, " << "servername=" << m_request->server_name() << ", req tags=" << tagstr << ", res addr=" << addr << ", res tags=" << res_tag_str;
 }

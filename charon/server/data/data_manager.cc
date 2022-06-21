@@ -50,25 +50,36 @@ int DataManager::getHashIndex(const std::string& key) {
 
 
 bool DataManager::getValue(const std::string& key, std::string& value) {
+  Node* node = getNode(key);
+  if (node && node->is_able) {
+    value = node->value;
+    AppDebugLog << "get k-v success, key=" << key << ", v=" << value;
+    return true;
+  }
+  AppDebugLog << "get k-v faled, key=" << key;
+  return false;
+}
+
+Node* DataManager::getNode(const std::string& key) {
   if (key.empty()) {
     AppErrorLog << "get k-v error, key is empty()!";
-    return false;
+    return NULL;
   }
+  Node* re = NULL;
   int cur_hash = GetThreadHash();
   int hash = getHashIndex(key);
 
   AppDebugLog << "key=" << key << ", current thread hash=" << cur_hash << ", data thread hash=" << hash;
-  bool re = false;
   if (cur_hash == hash) {
-    re = m_datalist[hash].getValue(key, value);
+    re = m_datalist[hash].getNode(key);
   } else {
     tinyrpc::Coroutine* cor = tinyrpc::Coroutine::GetCurrentCoroutine();
     auto resume = [cor]() {
       tinyrpc::Coroutine::Resume(cor);
     };
 
-    auto func = [hash, this, key, &value, &re, resume, cur_hash] () {
-      re = this->m_datalist[hash].getValue(key, value);
+    auto func = [hash, this, key, &re, resume, cur_hash] () {
+      re = this->m_datalist[hash].getNode(key);
       tinyrpc::GetServer()->getIOThreadPool()->addTask(cur_hash, resume);
     };
 
@@ -76,14 +87,14 @@ bool DataManager::getValue(const std::string& key, std::string& value) {
     tinyrpc::Coroutine::Yield();
   }
 
-  AppDebugLog << "get k-v success, key=" << key << ", v=" << value << ", hash io thread=" << hash;
+  AppDebugLog << "get Node success, key=" << key << ", hash io thread=" << hash;
   return re;
 
 }
 
 // expire_time, ms
 // this key-value will be delete when expire_time arrive
-void DataManager::setValue(const std::string& key, const std::string& value, int64_t expire_time /* = 0*/) {
+void DataManager::setNode(const std::string& key, const std::string& value, int64_t expire_time /* = 0*/) {
   if (key.empty()) {
     AppErrorLog << "set k-v error, key is empty()!";
   }
@@ -93,7 +104,7 @@ void DataManager::setValue(const std::string& key, const std::string& value, int
   AppDebugLog << "key=" << key << ", current thread hash=" << cur_hash << ", data thread hash=" << hash;
 
   if (cur_hash == hash) {
-    this->m_datalist[hash].setValue(key, value, expire_time);
+    this->m_datalist[hash].setNode(key, value, expire_time);
   } else {
     tinyrpc::Coroutine* cor = tinyrpc::Coroutine::GetCurrentCoroutine();
 
@@ -102,7 +113,7 @@ void DataManager::setValue(const std::string& key, const std::string& value, int
     };
 
     auto func = [hash, this, key, value, expire_time, resume, cur_hash] () {
-      this->m_datalist[hash].setValue(key, value, expire_time);
+      this->m_datalist[hash].setNode(key, value, expire_time);
       tinyrpc::GetServer()->getIOThreadPool()->addTask(cur_hash, resume);
     };
 

@@ -3,25 +3,30 @@
 
 #include <map>
 #include <string>
+#include <vector>
 #include "charon/pb/charon.pb.h"
 
 namespace charon {
 
 class ServerAddrUtil {
  public:
+
+  /**
+   **
+   ** //tag1/tag2/tag3\t score \t 192.1.1.1:80|//tag1/tag2/tag3 \t score \t 192.1.1.2:81
+   **
+   **/
   ServerAddrUtil() = default;
 
   ~ServerAddrUtil() = default;
 
-  static std::string GetAddrByTag(const std::string& value, const std::string& tag, std::string& re_tag);
+  static std::string GetAddrByTag(const std::string& value, const DiscoverTag& req_tag, DiscoverTag& res_tag);
 
-  static std::string GetAddrFromSingleValue(const std::string& value, std::string& tag);
+  static std::string GetAddrFromSingleValue(const std::string& value, DiscoverTag& res_tag);
 
   static std::string GetTagString(const DiscoverTag& tag);
 
   static DiscoverTag GetDiscoverTagByString(const std::string& tag_str);
-
-  static std::string GetTagByIndex(const std::string& tag_str, int index = 1);
 
   static bool GetIPPortFromAddr(const std::string& addr, std::string& ip, int& port);
 
@@ -40,7 +45,10 @@ class ServerAddrUtil {
   **/
   static bool CheckDisvcoverTagValid(const DiscoverTag& tag);
 
- public:
+  static bool CheckDisvcoverTagEmpty(const DiscoverTag& tag);
+
+ private:
+  static std::string GetRandomAddr(std::vector<std::string>& addr_list, DiscoverTag& res_tag);
 };
 
 }

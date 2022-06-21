@@ -19,10 +19,12 @@ class DataContainer {
   ~DataContainer();
 
   bool getValue(const std::string& key, std::string& value);
+
+  Node* getNode(const std::string& key);
   
   // expire_time, ms
   // this key-value will be delete when expire_time arrive
-  void setValue(const std::string& key, const std::string& value, int64_t expire_time = 0);
+  void setNode(const std::string& key, const std::string& value, int64_t expire_time = 0);
 
   bool isKeyExist(const std::string& key);
 
