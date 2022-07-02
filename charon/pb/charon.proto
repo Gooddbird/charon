@@ -34,11 +34,11 @@ message RegisterResponse {
   string res_info = 2;
 };
 
-
 service CharonService {
   // discover server addr
   rpc DiscoverServer(DiscoverRequest) returns (DiscoverResponse);
 
   // rpc method name
   rpc RegisterServer(RegisterRequest) returns (RegisterResponse);
+
 }

@@ -44,10 +44,15 @@ DataManager::~DataManager() {
 
 }
 
-int DataManager::getHashIndex(const std::string& key) {
-  return ((int)(key[0]) + (int)key[key.length() - 1]) % m_size;
+int DataManager::GetHashIndexOfKey(const std::string& key) {
+  return ((int)(key[0]) + (int)key[key.length() - 1]) % tinyrpc::GetIOThreadPoolSize();
 }
 
+bool DataManager::CheckKeyHash(const std::string& key, int& cur_hash, int& to_hash) {
+  cur_hash = tinyrpc::IOThread::GetCurrentIOThread()->getThreadIndex();
+  to_hash = GetHashIndexOfKey(key);
+  return cur_hash == to_hash;
+}
 
 bool DataManager::getValue(const std::string& key, std::string& value) {
   Node* node = getNode(key);
@@ -66,11 +71,13 @@ Node* DataManager::getNode(const std::string& key) {
     return NULL;
   }
   Node* re = NULL;
-  int cur_hash = GetThreadHash();
-  int hash = getHashIndex(key);
+  int cur_hash = 0;
+  int hash = 0;
+
+  bool flag = CheckKeyHash(key, cur_hash, hash);
 
   AppDebugLog << "key=" << key << ", current thread hash=" << cur_hash << ", data thread hash=" << hash;
-  if (cur_hash == hash) {
+  if (flag) {
     re = m_datalist[hash].getNode(key);
   } else {
     tinyrpc::Coroutine* cor = tinyrpc::Coroutine::GetCurrentCoroutine();
@@ -80,10 +87,10 @@ Node* DataManager::getNode(const std::string& key) {
 
     auto func = [hash, this, key, &re, resume, cur_hash] () {
       re = this->m_datalist[hash].getNode(key);
-      tinyrpc::GetServer()->getIOThreadPool()->addTask(cur_hash, resume);
+      tinyrpc::GetServer()->getIOThreadPool()->addTaskByIndex(cur_hash, resume);
     };
 
-    tinyrpc::GetServer()->getIOThreadPool()->addTask(hash, func);
+    tinyrpc::GetServer()->getIOThreadPool()->addTaskByIndex(hash, func);
     tinyrpc::Coroutine::Yield();
   }
 
@@ -99,11 +106,14 @@ void DataManager::setNode(const std::string& key, const std::string& value, int6
     AppErrorLog << "set k-v error, key is empty()!";
   }
 
-  int cur_hash = GetThreadHash();
-  int hash = getHashIndex(key);
+  int cur_hash = 0;
+  int hash = 0;
+
+  bool flag = CheckKeyHash(key, cur_hash, hash);
+
   AppDebugLog << "key=" << key << ", current thread hash=" << cur_hash << ", data thread hash=" << hash;
 
-  if (cur_hash == hash) {
+  if (flag) {
     this->m_datalist[hash].setNode(key, value, expire_time);
   } else {
     tinyrpc::Coroutine* cor = tinyrpc::Coroutine::GetCurrentCoroutine();
@@ -114,10 +124,10 @@ void DataManager::setNode(const std::string& key, const std::string& value, int6
 
     auto func = [hash, this, key, value, expire_time, resume, cur_hash] () {
       this->m_datalist[hash].setNode(key, value, expire_time);
-      tinyrpc::GetServer()->getIOThreadPool()->addTask(cur_hash, resume);
+      tinyrpc::GetServer()->getIOThreadPool()->addTaskByIndex(cur_hash, resume);
     };
 
-    tinyrpc::GetServer()->getIOThreadPool()->addTask(hash, func);
+    tinyrpc::GetServer()->getIOThreadPool()->addTaskByIndex(hash, func);
     tinyrpc::Coroutine::Yield();
   }
 
@@ -134,11 +144,14 @@ bool DataManager::isKeyExist(const std::string& key) {
     return false;
   }
 
-  int cur_hash = GetThreadHash();
-  int hash = getHashIndex(key);
+  int cur_hash = 0;
+  int hash = 0;
+
+  bool flag = CheckKeyHash(key, cur_hash, hash);
+
   AppDebugLog << "key=" << key << ", current thread hash=" << cur_hash << ", data thread hash=" << hash;
   bool re = false;
-  if (cur_hash == hash) {
+  if (flag) {
     re = this->m_datalist[hash].isKeyExist(key);
   } else {
     tinyrpc::Coroutine* cor = tinyrpc::Coroutine::GetCurrentCoroutine();
@@ -149,10 +162,10 @@ bool DataManager::isKeyExist(const std::string& key) {
 
     auto func = [hash, this, key, resume, cur_hash, &re] () {
       re = this->m_datalist[hash].isKeyExist(key);
-      tinyrpc::GetServer()->getIOThreadPool()->addTask(cur_hash, resume);
+      tinyrpc::GetServer()->getIOThreadPool()->addTaskByIndex(cur_hash, resume);
     };
 
-    tinyrpc::GetServer()->getIOThreadPool()->addTask(hash, func);
+    tinyrpc::GetServer()->getIOThreadPool()->addTaskByIndex(hash, func);
     tinyrpc::Coroutine::Yield();
   }
 

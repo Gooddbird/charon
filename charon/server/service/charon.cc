@@ -3,6 +3,8 @@
 #include "charon/server/service/charon.h"
 #include "charon/server/interface/discover_server.h"
 #include "charon/server/interface/register_server.h"
+#include "charon/server/interface/ask_vote.h"
+#include "charon/server/interface/append_log_entries.h"
 #include "charon/comm/exception.h"
 #include "tinyrpc/comm/log.h"
 
@@ -11,7 +13,9 @@
   response->set_ret_code(0); \
   response->set_res_info("OK"); \
   try { \
+    AppInfoLog << "Get request:{" << request->ShortDebugString() << "}"; \
     impl.run(); \
+    AppInfoLog << "Get request:{" << request->ShortDebugString() << "} success, response:{" << response->ShortDebugString() << "}"; \
   } catch (charon::CharonException& e) { \
     AppErrorLog << "occur CharonException, error code = " << e.code() << ", errinfo = " << e.error(); \
     response->set_ret_code(e.code()); \
@@ -47,5 +51,22 @@ void Charon::RegisterServer(::google::protobuf::RpcController* controller,
   CALL_CHARON_INTERFACE(RegisterServerImpl);
 }
 
+
+void Raft::AskVote(::google::protobuf::RpcController* controller,
+                      const ::AskVoteRequest* request,
+                      ::AskVoteResponse* response,
+                      ::google::protobuf::Closure* done) {
+
+  CALL_CHARON_INTERFACE(AskVoteImpl);
+
+}
+
+void Raft::AppendLogEntries(::google::protobuf::RpcController* controller,
+                      const ::AppendLogEntriesRequest* request,
+                      ::AppendLogEntriesResponse* response,
+                      ::google::protobuf::Closure* done) {
+
+  CALL_CHARON_INTERFACE(AppendLogEntriesImpl);
+}
 
 }

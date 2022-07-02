@@ -19,10 +19,6 @@ class DataManager {
 
   ~DataManager();
 
-  static DataManager* GetDataManager();
-
-  int getHashIndex(const std::string& key);
-
   bool getValue(const std::string& key, std::string& value);
 
   Node* getNode(const std::string& key);
@@ -32,6 +28,20 @@ class DataManager {
   void setNode(const std::string& key, const std::string& value, int64_t expire_time = 0);
 
   bool isKeyExist(const std::string& key);
+
+
+ public:
+
+  static DataManager* GetDataManager();
+
+  // use key to dicide which iothread 
+  // cur_hash -- current iothread' hash index
+  // to_hash -- this key's iothread' hash indexcur_hash == hash
+  // return true if cur_hash == to_hash, otherwises return false
+  static bool CheckKeyHash(const std::string& key, int& cur_hash, int& to_hash);
+
+  // dicide thread hash index of this key
+  static int GetHashIndexOfKey(const std::string& key);
 
  public:
   std::vector<DataContainer> m_datalist;

@@ -7,7 +7,8 @@ namespace charon {
 class CharonException : public std::exception {
  public:
 
-  CharonException(long long code, const std::string& errinfo);
+  template<typename... Args>
+  CharonException(long long code, const char* str, Args&&... args); 
   ~CharonException();
 
   const char* what();
