@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include "tinyrpc/net/mutex.h"
 
 namespace charon {
 
@@ -31,6 +32,7 @@ class DataContainer {
  public:
   // all key-values
   std::map<std::string, Node> m_db;
+  tinyrpc::CoroutineMutex m_cor_mutex; 
 };
 
 }

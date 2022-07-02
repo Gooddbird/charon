@@ -2,6 +2,7 @@
 #include "charon/server/data/data_container.h"
 #include "tinyrpc/net/timer.h"
 #include "tinyrpc/net/reactor.h"
+#include "tinyrpc/net/mutex.h"
 #include "tinyrpc/comm/log.h"
 
 
@@ -16,6 +17,10 @@ DataContainer::~DataContainer() {
 }
 
 Node* DataContainer::getNode(const std::string& key) {
+  // add coroutine lock, to avoid when one coroutine getNode and not finish, then yiled to main couroutine
+  // main coroutine then resume another coroutine which also want to change m_db,such as excute setNode
+  // it will casue coroutine safe problem
+  tinyrpc::CoroutineMutex::Lock lock(m_cor_mutex);
   auto it = m_db.find(key);
   if (it != m_db.end()) {
     return NULL;
@@ -24,6 +29,7 @@ Node* DataContainer::getNode(const std::string& key) {
 }
   
 void DataContainer::setNode(const std::string& key, const std::string& value, int64_t expire_time /*=0*/) {
+  tinyrpc::CoroutineMutex::Lock lock(m_cor_mutex);
   Node node;
   node.value = value;
   node.expire_time = expire_time;
@@ -43,6 +49,7 @@ void DataContainer::setNode(const std::string& key, const std::string& value, in
 }
 
 bool DataContainer::isKeyExist(const std::string& key) {
+  tinyrpc::CoroutineMutex::Lock lock(m_cor_mutex);
   auto it = m_db.find(key);
   if (it == m_db.end() || it->second.is_able == false) {
     return false;

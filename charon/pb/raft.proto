@@ -1,0 +1,77 @@
+syntax = "proto3";
+option cc_generic_services = true;
+
+
+message LogEntry {
+  int32 index = 1;
+  int32 term = 2;
+  string cmd = 3;
+};
+
+message AskVoteRequest {
+  // current candidate term
+  int32 term = 1;
+  // the candidate's id
+  int32 candidate_id = 2;
+
+  // the last log entry term of candidate
+  int32 last_log_term = 3;
+  // the last log entry index of candidate
+  int32 last_log_index = 4;
+
+  int32 thread_hash = 5;
+};
+
+message AskVoteResponse {
+  int32 ret_code = 1;
+  string res_info = 2;
+
+  // the foller's term
+  int32 cur_term = 3;
+  // 0 -- foller give a vote, otherwise not give
+  int32 vote_result = 4;
+
+};
+
+message AppendLogEntriesRequest {
+  // the leader's term
+  int32 term = 1;
+  // the leader's id
+  int32 leader_id = 2;
+  // the prev log' index of new log entries 
+  int32 prev_log_index = 3;
+  // the prev log' term of new log entries 
+  int32 prev_log_term = 4;
+
+  // the leader's max high commit log entry index
+  int32 leader_commit_index = 5;
+
+  repeated LogEntry log_entries = 6;
+
+  int32 thread_hash = 7;
+};
+
+message AppendLogEntriesResponse {
+  int32 ret_code = 1;
+  string res_info = 2;
+  // the foller's term
+  int32 cur_term = 3;
+
+  // 0 -- foller append log entries success, otherwise failed
+  int32 append_result = 4;
+  // reason of append log why failed
+  string append_fail_reason = 5;
+
+};
+
+service RaftService {
+  // these are raft algorithm rpc
+
+  // ask server to obtain a vote, to help become leader
+  rpc AskVote(AskVoteRequest) returns (AskVoteResponse);
+
+  // only leader call, to append log to other followers 
+  rpc AppendLogEntries(AppendLogEntriesRequest) returns (AppendLogEntriesResponse);
+
+
+}

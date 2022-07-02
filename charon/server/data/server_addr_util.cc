@@ -173,9 +173,15 @@ DiscoverTag ServerAddrUtil::GetDiscoverTagByString(const std::string& tag_str) {
 
 bool ServerAddrUtil::CheckDisvcoverTagValid(const DiscoverTag& tag) {
   std::string tmp = tag.tag1() + tag.tag2() + tag.tag3();
+  if (tmp.empty()) {
+    return true;
+  }
+
   CHECK_STR_IN_STRING(tmp, " ");
   CHECK_STR_IN_STRING(tmp, "/");
   CHECK_STR_IN_STRING(tmp, "|");
+  CHECK_STR_IN_STRING(tmp, "\t");
+
   if (!tag.tag2().empty()) {
     if (tag.tag1().empty()) {
       return false;
@@ -202,9 +208,9 @@ bool ServerAddrUtil::CheckServerNameValid(const std::string& name) {
   }
 
   CHECK_STR_IN_STRING(name, " ");
-  CHECK_STR_IN_STRING(name, "*");
   CHECK_STR_IN_STRING(name, "/");
   CHECK_STR_IN_STRING(name, "|");
+  CHECK_STR_IN_STRING(name, "\t");
 
   return true;
 }

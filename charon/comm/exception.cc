@@ -1,13 +1,16 @@
 #include <exception>
 #include <string>
 #include "charon/comm/exception.h"
+#include "tinyrpc/comm/log.h"
 
 
 namespace charon {
 
-CharonException::CharonException(long long code, const std::string& errinfo) : 
-  m_error_code(code), m_error_info(errinfo) {
-
+template<typename... Args>
+CharonException::CharonException(long long code, const char* str, Args&&... args) {
+  m_error_code = code;
+  sprintf(m_error_info.c_str(), str, std::forward<Args>(args)...);
+  AppInfoLog << "throw CharonException: {code: " << m_error_code <<", errinfo:" << m_error_info << "}"; 
 }
 
 CharonException::~CharonException() {}
