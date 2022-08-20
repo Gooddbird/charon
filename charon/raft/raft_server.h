@@ -2,11 +2,10 @@
 #define TINYRPC_RAFT_RAFT_SERVER_H
 
 #include <vector>
-#include "charon/pb/charon.pb.h"
+#include "charon/pb/raft.pb.h"
 
 
 namespace charon {
-
 
 enum RaftServerState {
   FOLLOWER = 1,
@@ -26,14 +25,20 @@ class RaftServer {
  public:
   static RaftServer* GetRaftServer();
 
- // common state of all server
  public:
+  void handleAskVote(const AskVoteRequest& request, AskVoteResponse& response);
+
+  void handleAppendLogEntries(const AppendLogEntriesRequest& request, AppendLogEntriesResponse& response);
+
+ // common state of all server
+ private:
   // Persistence state, you need store these states before rpc response 
   int m_current_term {0};
   int m_voted_for_id {0};
+  // all logs have already apply to state machine
   std::vector<LogEntry> m_logs;
 
-
+ private:
   // volatile state
 
   // the highest commit log index
@@ -42,10 +47,11 @@ class RaftServer {
   int m_last_applied_index {0};
 
  // only leader state
- public:
+ private:
+  // leader should send log's index for every server
   std::vector<int> m_next_indexs;
+  // every server have already apply log'index
   std::vector<int> m_match_indexs;
-
 
 
  private:

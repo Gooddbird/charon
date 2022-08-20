@@ -9,8 +9,8 @@ message LogEntry {
 };
 
 message AskVoteRequest {
-  // current candidate term
-  int32 term = 1;
+  // the candidate's term
+  int32 candidate_term = 1;
   // the candidate's id
   int32 candidate_id = 2;
 
@@ -19,23 +19,24 @@ message AskVoteRequest {
   // the last log entry index of candidate
   int32 last_log_index = 4;
 
-  int32 thread_hash = 5;
 };
 
 message AskVoteResponse {
   int32 ret_code = 1;
   string res_info = 2;
 
-  // the foller's term
-  int32 cur_term = 3;
-  // 0 -- foller give a vote, otherwise not give
+  // current term
+  int32 term = 3;
+  // 1 -- give a vote, otherwise not give
   int32 vote_result = 4;
+  // why not vote
+  string vote_fail_reason = 5;
 
 };
 
 message AppendLogEntriesRequest {
   // the leader's term
-  int32 term = 1;
+  int32 leader_term = 1;
   // the leader's id
   int32 leader_id = 2;
   // the prev log' index of new log entries 
@@ -48,16 +49,15 @@ message AppendLogEntriesRequest {
 
   repeated LogEntry log_entries = 6;
 
-  int32 thread_hash = 7;
 };
 
 message AppendLogEntriesResponse {
   int32 ret_code = 1;
   string res_info = 2;
-  // the foller's term
-  int32 cur_term = 3;
+  // the follewer's term
+  int32 term = 3;
 
-  // 0 -- foller append log entries success, otherwise failed
+  // 1 -- follewer append log entries success, otherwise failed
   int32 append_result = 4;
   // reason of append log why failed
   string append_fail_reason = 5;

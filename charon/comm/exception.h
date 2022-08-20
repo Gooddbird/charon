@@ -1,3 +1,6 @@
+#ifndef CHARON_COMM_EXCEPTION_H
+#define CHARON_COMM_EXCEPTION_H
+
 #include <exception>
 #include <string>
 
@@ -24,3 +27,5 @@ class CharonException : public std::exception {
 };
 
 }
+
+#endif

@@ -3,22 +3,23 @@
   <!--log config-->
   <log>
     <!--identify path of log file-->
-    <log_path>../log</log_path>
-    <log_prefix>charon</log_prefix>
+    <log_path>./</log_path>
+    <log_prefix>test_tinypb_server</log_prefix>
 
     <!--identify max size of single log file, MB-->
     <log_max_file_size>5</log_max_file_size>
 
     <!--log level: DEBUG < INFO < WARN < ERROR-->
-    <log_level>DEBUG</log_level>
+    <rpc_log_level>DEBUG</rpc_log_level>
+    <app_log_level>DEBUG</app_log_level>
 
-    <!--inteval that put log info to async logger, s-->
-    <log_sync_inteval>1</log_sync_inteval>
+    <!--inteval that put log info to async logger, ms-->
+    <log_sync_inteval>500</log_sync_inteval>
   </log>
 
   <coroutine>
     <!--coroutine stack size (KB)-->
-    <coroutine_stack_size>128</coroutine_stack_size>
+    <coroutine_stack_size>256</coroutine_stack_size>
 
     <!--default coroutine pool size-->
     <coroutine_pool_size>1000</coroutine_pool_size>
@@ -30,7 +31,8 @@
   <!--max time when call connect, s-->
   <max_connect_timeout>75</max_connect_timeout>
 
-  <iothread_num>10</iothread_num>
+  <!--count of io threads, at least 1-->
+  <iothread_num>4</iothread_num>
 
   <time_wheel>
     <bucket_num>6</bucket_num>
@@ -40,9 +42,21 @@
   </time_wheel>
 
   <server>
-    <ip>0.0.0.0</ip>
-    <port>18888</port>
+    <ip>127.0.0.1</ip>
+    <port>12138</port>
     <protocal>TinyPB</protocal>
   </server>
+
+  <database>
+    <db_key name="test_db_key1">
+      <!-- <ip>127.0.0.1</ip> -->
+      <ip>192.168.245.7</ip>
+      <port>3306</port>
+      <user>root</user>
+      <passwd>Ikerli20220517!!</passwd>
+      <select_db></select_db>
+      <char_set>utf8mb4</char_set>
+    </db_key>
+  </database>
 
 </root>
