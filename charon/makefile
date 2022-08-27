@@ -8,6 +8,7 @@ PATH_INTERFACE = server/interface
 PATH_DATA = server/data
 PATH_COMM = comm
 PATH_PB = pb
+PATH_RAFT = raft
 PATH_TINYRPC = ../../tinyrpc
 
 
@@ -29,6 +30,7 @@ LIBS += /usr/lib/libprotobuf.a /usr/lib/libtinyxml.a
 LIBS += $(TINYRPC_LIB)
 
 PB_OBJS := $(patsubst $(PATH_PB)/%.cc, $(PATH_PB)/%.o, $(wildcard $(PATH_PB)/*.cc))
+RAFT_OBJS := $(patsubst $(PATH_RAFT)/%.cc, $(PATH_RAFT)/%.o, $(wildcard $(PATH_RAFT)/*.cc))
 SERVICE_OBJS := $(patsubst $(PATH_SERVICE)/%.cc, $(PATH_SERVICE)/%.o, $(wildcard $(PATH_SERVICE)/*.cc))
 INTERFACE_OBJS := $(patsubst $(PATH_INTERFACE)/%.cc, $(PATH_INTERFACE)/%.o, $(wildcard $(PATH_INTERFACE)/*.cc))
 DATA_OBJS := $(patsubst $(PATH_DATA)/%.cc, $(PATH_DATA)/%.o, $(wildcard $(PATH_DATA)/*.cc))
@@ -37,10 +39,13 @@ COMM_OBJS := $(patsubst $(PATH_COMM)/%.cc, $(PATH_COMM)/%.o, $(wildcard $(PATH_C
 
 OUT : $(TARGET)
 
-$(TARGET) : $(PB_OBJS) $(SERVICE_OBJS) $(INTERFACE_OBJS) $(DATA_OBJS) $(COMM_OBJS)
+$(TARGET) : $(PB_OBJS) $(SERVICE_OBJS) $(INTERFACE_OBJS) $(DATA_OBJS) $(COMM_OBJS) $(RAFT_OBJS)
 	$(CXX) $(CXX_FLAGS) -o $@ $(LIBS) -ldl -lpthread
 
 $(PATH_PB)/%.o : $(PATH_PB)/%.cc
+	$(CXX) $(CXX_FLAGS) -c $< -o $@
+
+$(PATH_RAFT)/%.o : $(PATH_RAFT)/%.cc
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
 
 $(PATH_SERVICE)/%.o : $(PATH_SERVICE)/%.cc
@@ -55,7 +60,9 @@ $(PATH_DATA)/%.o : $(PATH_DATA)/%.cc
 $(PATH_COMM)/%.o : $(PATH_COMM)/%.cc
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
 
+
+
 PRINT-% : ; @echo $* = $($*)
 
 clean :
-	rm -f $(PB_OBJS) $(SERVICE_OBJS) $(INTERFACE_OBJS) $(TARGET) $(DATA_OBJS) $(COMM_OBJS)
+	rm -f $(PB_OBJS) $(SERVICE_OBJS) $(INTERFACE_OBJS) $(TARGET) $(DATA_OBJS) $(COMM_OBJS) $(RAFT_OBJS)

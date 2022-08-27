@@ -2,7 +2,7 @@
 #define CHARON_SERVER_INTERFACE_APPEND_LOG_ENTRIES_IMPL_H 
 
 #include "charon/pb/raft.pb.h"
-#include "charon/raft/raft_server.h"
+#include "charon/raft/raft_node.h"
 
 namespace charon {
 
@@ -25,7 +25,6 @@ class AppendLogEntriesImpl {
  private:
   const AppendLogEntriesRequest* m_request {NULL};
   AppendLogEntriesResponse* m_response {NULL};
-  RaftServer* m_raft_server;
   int m_current_thread_hash {-1};
   int m_to_thread_hash {-1};
 

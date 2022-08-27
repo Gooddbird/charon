@@ -1,6 +1,11 @@
 syntax = "proto3";
 option cc_generic_services = true;
 
+enum VoteResult {
+  UNKNOWN = 0;
+  VOTE_SUCC = 1;
+  VOTE_FAILED = 2;
+};
 
 message LogEntry {
   int32 index = 1;
@@ -19,6 +24,12 @@ message AskVoteRequest {
   // the last log entry index of candidate
   int32 last_log_index = 4;
 
+  int32 node_id = 5;
+
+  string node_name = 6;
+
+  string node_addr = 7;
+
 };
 
 message AskVoteResponse {
@@ -28,10 +39,15 @@ message AskVoteResponse {
   // current term
   int32 term = 3;
   // 1 -- give a vote, otherwise not give
-  int32 vote_result = 4;
+  VoteResult vote_result = 4;
   // why not vote
   string vote_fail_reason = 5;
 
+  int32 node_id = 6;
+
+  string node_name = 7;
+
+  string node_addr = 8;
 };
 
 message AppendLogEntriesRequest {
@@ -47,7 +63,14 @@ message AppendLogEntriesRequest {
   // the leader's max high commit log entry index
   int32 leader_commit_index = 5;
 
+
   repeated LogEntry log_entries = 6;
+
+  int32 node_id = 7;
+
+  string node_name = 8;
+
+  string node_addr = 9;
 
 };
 
@@ -62,6 +85,11 @@ message AppendLogEntriesResponse {
   // reason of append log why failed
   string append_fail_reason = 5;
 
+  int32 node_id = 6;
+
+  string node_name = 7;
+
+  string node_addr = 8;
 };
 
 service RaftService {

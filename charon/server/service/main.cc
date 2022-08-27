@@ -6,8 +6,8 @@ int main(int argc, char* argv[]) {
 
   tinyrpc::InitConfig("../conf/charon.xml");
 
-  tinyrpc::GetServer()->registerService(std::make_shared<charon::Charon>());
-  tinyrpc::GetServer()->registerService(std::make_shared<charon::Charon>());
+  // tinyrpc::GetServer()->registerService(std::make_shared<charon::Charon>());
+  tinyrpc::GetServer()->registerService(std::make_shared<charon::Raft>());
 
   tinyrpc::StartRpcServer();
   

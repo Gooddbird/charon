@@ -59,4 +59,11 @@
     </db_key>
   </database>
 
+  <raft>
+    <node_groups>
+      <node group_id = "1" addr = "127.0.0.1:30001"></node>
+      <node group_id = "2" addr = "127.0.0.1:30002"></node>
+      <node group_id = "3" addr = "127.0.0.1:30003"></node>
+    </node_groups>
+  </raft>
 </root>
