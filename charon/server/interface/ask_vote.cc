@@ -27,6 +27,7 @@ void AskVoteImpl::checkInput() {
 }
 
 void AskVoteImpl::execute() {
+
   RaftNode::GetRaftNode()->handleAskVote(*m_request, *m_response);
 }
 

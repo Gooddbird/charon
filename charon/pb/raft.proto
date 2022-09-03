@@ -2,9 +2,15 @@ syntax = "proto3";
 option cc_generic_services = true;
 
 enum VoteResult {
-  UNKNOWN = 0;
+  VOTE_UNKNOWN = 0;
   VOTE_SUCC = 1;
   VOTE_FAILED = 2;
+};
+
+enum AppendResult {
+  APPEND_UNKNOWN = 0;
+  APPEND_SUCC = 1;
+  APPEND_FAILED = 2;
 };
 
 message LogEntry {
@@ -30,6 +36,10 @@ message AskVoteRequest {
 
   string node_addr = 7;
 
+  // to support hash by thread, multi raft
+  // it is a same raft group when hashid is same
+  int32 hashid = 8;
+
 };
 
 message AskVoteResponse {
@@ -38,7 +48,7 @@ message AskVoteResponse {
 
   // current term
   int32 term = 3;
-  // 1 -- give a vote, otherwise not give
+  // give a vote?
   VoteResult vote_result = 4;
   // why not vote
   string vote_fail_reason = 5;
@@ -48,6 +58,8 @@ message AskVoteResponse {
   string node_name = 7;
 
   string node_addr = 8;
+
+  int32 hashid = 9;
 };
 
 message AppendLogEntriesRequest {
@@ -72,6 +84,7 @@ message AppendLogEntriesRequest {
 
   string node_addr = 9;
 
+  int32 hashid = 10;
 };
 
 message AppendLogEntriesResponse {
@@ -80,8 +93,8 @@ message AppendLogEntriesResponse {
   // the follewer's term
   int32 term = 3;
 
-  // 1 -- follewer append log entries success, otherwise failed
-  int32 append_result = 4;
+  // append succ?
+  AppendResult append_result = 4;
   // reason of append log why failed
   string append_fail_reason = 5;
 
@@ -90,6 +103,8 @@ message AppendLogEntriesResponse {
   string node_name = 7;
 
   string node_addr = 8;
+
+  int32 hashid = 9;
 };
 
 service RaftService {

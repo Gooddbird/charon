@@ -28,6 +28,8 @@ class RaftNode {
  public:
   static RaftNode* GetRaftNode();
 
+  void init();
+
  public:
   // deal askVote RPC
   void handleAskVote(const AskVoteRequest& request, AskVoteResponse& response);
@@ -46,6 +48,7 @@ class RaftNode {
 
   // only candidate execute
   void candidateHandler();
+
 
  public:
   // apply log to state Machine
@@ -73,10 +76,10 @@ class RaftNode {
   std::vector<LogEntry> m_logs;
   
   // node info about all distributed server 
-  // index of vector is node'id, from 1 start
   // map is used to describe node info
   // key1: "addr" , value1: "127.0.0.1:19999"
   // key2: "name", value2: "xxx"
+  // key3: "id", value3: "xxx"
   std::vector<KVMap> m_nodes;
 
  private:
@@ -101,6 +104,17 @@ class RaftNode {
   int m_node_id {0};
   std::string m_node_name;
   std::string m_node_addr;
+};
+
+
+class RaftNodeContainer {
+ public:
+
+  RaftNodeContainer();
+  ~RaftNodeContainer();
+
+ private:
+  std::vector<RaftNode*> m_container;
 };
 
 }

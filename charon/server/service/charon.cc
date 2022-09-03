@@ -7,6 +7,9 @@
 #include "charon/server/interface/append_log_entries.h"
 #include "charon/comm/exception.h"
 #include "tinyrpc/comm/log.h"
+#include "tinyrpc/comm/start.h"
+#include "tinyrpc/net/tcp/io_thread.h"
+#include "tinyrpc/coroutine/coroutine.h"
 
 #define CALL_CHARON_INTERFACE(type) \
   type impl(request, response); \
@@ -57,8 +60,8 @@ void Raft::AskVote(::google::protobuf::RpcController* controller,
                       ::AskVoteResponse* response,
                       ::google::protobuf::Closure* done) {
 
-  CALL_CHARON_INTERFACE(AskVoteImpl);
 
+  CALL_CHARON_INTERFACE(AskVoteImpl);
 }
 
 void Raft::AppendLogEntries(::google::protobuf::RpcController* controller,

@@ -18,15 +18,15 @@ namespace charon {
 static thread_local RaftNode* t_raft_node = NULL;
 
 RaftNode::RaftNode() {
-  m_current_term = 1;
+  m_current_term = 0;
   m_state = FOLLOWER;
-  m_nodes.emplace_back(KVMap());
+  m_nodes.resize(100);
 
   std::string local_addr = tinyrpc::GetServer()->getLocalAddr()->toString();
 
   TiXmlElement* node =  tinyrpc::GetConfig()->getXmlNode("raft");
   assert(node != NULL);
-  TiXmlElement* groups_node = node->FirstChildElement("node_list"); 
+  TiXmlElement* groups_node = node->FirstChildElement("rafe_servers"); 
 
   for (TiXmlElement* xmlnode = groups_node->FirstChildElement(); xmlnode!= NULL; xmlnode = xmlnode->NextSiblingElement()) {
     m_node_count++;
@@ -34,15 +34,20 @@ RaftNode::RaftNode() {
     std::string addr = std::string(xmlnode->Attribute("addr"));
     node["addr"] = addr;
 
-    int group_id = std::atoi(xmlnode->Attribute("group_id"));
-    std::string node_name = std::to_string(group_id) + "-" + std::to_string(tinyrpc::IOThread::GetCurrentIOThread()->getThreadIndex() + 1);
+    int id = std::atoi(xmlnode->Attribute("id"));
+    std::string node_name = std::to_string(id) + "-" + std::to_string(tinyrpc::IOThread::GetCurrentIOThread()->getThreadIndex() + 1);
     node["name"] =  node_name;
+    node["id"] = id;
+
+    InfoLog << "read raft server conf[" << addr << ":" << node_name << "]";
 
     if (addr == local_addr) {
-      m_node_id = group_id;
+      m_node_id = id;
       m_node_addr = addr;
       m_node_name = node_name;
+      InfoLog << "read raft server conf[" << addr << ":" << node_name << "]";
     }
+    m_nodes[id] = node;
   }
 
 }
@@ -74,18 +79,22 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
   }
   if (m_voted_for_id == 0 || m_voted_for_id == request.candidate_id()) {
     if (request.last_log_index() >= (int32_t)m_logs.size()) {
+      AppInfoLog << formatString("AskVote to [%s - %d - %s] succ",
+          request.node_addr().c_str(), request.node_id(), request.node_name().c_str());
+      m_voted_for_id = request.node_id();
       response.set_vote_result(VOTE_SUCC);
-      AppInfoLog << "AskVote succ";
+      m_state = CANDIDATE;
+      return;
     }
   }
 }
 
 void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, AppendLogEntriesResponse& response) {
   response.set_term(m_current_term);
-  response.set_append_result(0);
+  response.set_append_result(APPEND_FAILED);
   if (request.leader_term() < m_current_term) {
     // return false when leader's term less than current Node's term
-    response.set_append_result(0);
+    response.set_append_result(APPEND_FAILED);
     response.set_append_fail_reason("AppendLogEntries failed, leader's term is less than current term");
 
     return;
@@ -96,7 +105,7 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
       || (m_logs[prev_log_index].term() != request.prev_log_term())) {
 
     // return false when Node can't find log match(prev_log_index, prev_log_term) 
-    response.set_append_result(0);
+    response.set_append_result(APPEND_FAILED);
     response.set_append_fail_reason(
       formatString("AppendLogEntries failed, Node can't match prev_log_index[%d], prev_log_term[%d]",
         prev_log_index, request.prev_log_term()));
@@ -117,7 +126,7 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
     m_commit_index = std::min(request.leader_commit_index(), (int32_t)m_logs.size());
   }
 
-  response.set_append_result(1);
+  response.set_append_result(APPEND_SUCC);
 
 }
 
@@ -151,15 +160,13 @@ int RaftNode::applyToStateMachine(const LogEntry& logs) {
 }
 
 int RaftNode::askVote() {
-  tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();
   if (m_state != CANDIDATE) {
     AppErrorLog << "current raft node [" << m_node_name << "] state isn't CANDIDATE, can't askVote";
     return -1;
   }
-  // first add current term
-  m_current_term++;
-  // give vote to self
-  m_voted_for_id = m_node_id; 
+
+  RaftNode* currentiRaftNode = this;
+  tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();
 
   // total get votes count, first is 1 (beacsuse give a vote to self)
   int get_votes = 1;
@@ -181,7 +188,7 @@ int RaftNode::askVote() {
     tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
 
     tinyrpc::TinyPbRpcClosure::ptr closure = std::make_shared<tinyrpc::TinyPbRpcClosure>(
-      [&get_votes, &res_nodes, request, response, rpc_controller, cur_cor]() mutable {
+      [&get_votes, &res_nodes, request, response, rpc_controller, cur_cor, currentiRaftNode]() mutable {
         res_nodes++;
         // if call resume, there's request will not deconstruct, it cause memory leak
         // we just need get normal point there
@@ -194,20 +201,20 @@ int RaftNode::askVote() {
 
         if (controller->ErrorCode() ==0 &&
           res->ret_code() == 0 && res->vote_result() == VOTE_SUCC) {
-          AppDebugLog << formatString("[%s - %d - %s] receive a vote from [%s - %d - %s]",
-            req->node_addr(), req->node_id(), req->node_name(),
-            res->node_addr(), res->node_id(), res->node_name());
+          AppDebugLog << formatString("[Term: %d][%s - %d - %s] receive a vote from [%s - %d - %s]",
+            req->candidate_term(), req->node_addr().c_str(), req->node_id(), req->node_name().c_str(),
+            res->node_addr().c_str(), res->node_id(), res->node_name().c_str());
 
           get_votes++;
-          if (get_votes >= RaftNode::GetRaftNode()->getMostNodeCount()) {
-            AppInfoLog <<  formatString("[%s - %d - %s] receive more than half votes, resume ",
-              req->node_addr(), req->node_id(), req->node_name());
+          if (get_votes >= currentiRaftNode->getMostNodeCount()) {
+            AppInfoLog <<  formatString("[Term: %d][%s - %d - %s] receive more than half votes, resume ",
+              req->candidate_term(), req->node_addr().c_str(), req->node_id(), req->node_name().c_str());
 
             tinyrpc::Coroutine::Resume(cur_cor);
             return;
           }
         }
-        if (res_nodes + 1 == RaftNode::GetRaftNode()->getNodeCount()) {
+        if (res_nodes + 1 == currentiRaftNode->getNodeCount()) {
           // the last node response, also resume
           tinyrpc::Coroutine::Resume(cur_cor);
         }
@@ -234,12 +241,13 @@ int RaftNode::askVote() {
   // pending, will be resume by two ways
   // 1. more than half node give votes to this raft node
   // 2. all nodes already response
+  // 3. receive AppendLogEntries req from higher term raft node
   tinyrpc::Coroutine::Yield();
 
 
   if (get_votes >= GetRaftNode()->getMostNodeCount()) {
-    AppInfoLog << formatString("[%s - %d - %s] receive most node vote, now resume coroutine, ready to become leader node",
-      m_node_addr.c_str(), m_node_id, m_node_name.c_str());
+    AppInfoLog << formatString("[Term: %d][%s - %d - %s] receive most node votes, now resume coroutine, ready to become leader node",
+      m_current_term, m_node_addr.c_str(), m_node_id, m_node_name.c_str());
     return 0;
   }
 
@@ -270,6 +278,34 @@ void RaftNode::setState(RaftNodeState state) {
   m_state = state;
 }
 
+
+void RaftNode::init() {
+  charon::RaftNode* node = charon::RaftNode::GetRaftNode();
+  m_state = FOLLOWER;
+
+  // first add current term
+  m_current_term++;
+  // give vote to self
+  m_voted_for_id = m_node_id; 
+
+  AppDebugLog << formatString("[%s - %d - %s] [term: %d] begin to ask vote",
+            m_node_addr.c_str(), m_node_id, m_node_name.c_str(), m_current_term);
+
+  node->askVote();
+
+
+}
+
+// RaftNodeContainer::RaftNodeContainer() {
+//   int size = tinyrpc::GetIOThreadPoolSize();
+//   for (int i =0; i < size; ++i) {
+//     m_container.push_back(new RaftNode());
+//   }
+// }
+
+// RaftNodeContainer:: ~RaftNodeContainer() {
+
+// }
 
 }
 
