@@ -53,13 +53,15 @@ message AskVoteResponse {
   // why not vote
   string vote_fail_reason = 5;
 
-  int32 node_id = 6;
+  int32 vote_fail_code = 6;
 
-  string node_name = 7;
+  int32 node_id = 7;
 
-  string node_addr = 8;
+  string node_name = 8;
 
-  int32 hashid = 9;
+  string node_addr = 9;
+
+  int32 hashid = 10;
 };
 
 message AppendLogEntriesRequest {
@@ -76,6 +78,7 @@ message AppendLogEntriesRequest {
   int32 leader_commit_index = 5;
 
 
+
   repeated LogEntry log_entries = 6;
 
   int32 node_id = 7;
@@ -85,6 +88,8 @@ message AppendLogEntriesRequest {
   string node_addr = 9;
 
   int32 hashid = 10;
+  // last log index in log_enrties, if appendLog succ, use this value to help update nextIndex and matchIndex
+  int32 last_log_index = 11;
 };
 
 message AppendLogEntriesResponse {
@@ -98,13 +103,19 @@ message AppendLogEntriesResponse {
   // reason of append log why failed
   string append_fail_reason = 5;
 
-  int32 node_id = 6;
+  int32 append_fail_code = 6;
 
-  string node_name = 7;
+  int32 node_id = 7;
 
-  string node_addr = 8;
+  string node_name = 8;
 
-  int32 hashid = 9;
+  string node_addr = 9;
+
+  int32 hashid = 10;
+
+  // if can't find match pre_log_index pre_log_term, return the last can match log's index and term
+  int32 need_index = 11;
+  int32 need_term = 12;
 };
 
 service RaftService {

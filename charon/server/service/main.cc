@@ -11,13 +11,7 @@ int main(int argc, char* argv[]) {
   // tinyrpc::GetServer()->registerService(std::make_shared<charon::Charon>());
   tinyrpc::GetServer()->registerService(std::make_shared<charon::Raft>());
   auto cb = []() {
-    srand(time(0));
-    int i = rand() % (5) + 3;
-    sleep(i);
 
-    printf("sleep %d s end, now to askVote\n", i);
-    charon::RaftNode* node = charon::RaftNode::GetRaftNode();
-    node->askVote();
   };
   tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToEachThread(cb);
 

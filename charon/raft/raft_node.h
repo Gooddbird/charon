@@ -4,6 +4,12 @@
 #include <vector>
 #include <map>
 #include "charon/pb/raft.pb.h"
+#include "tinyrpc/net/mutex.h"
+
+
+// raft errcode define
+#define ERR_TERM_MORE_THAN_LEADER 80000001
+#define ERR_NOT_MATCH_PREINDEX 80000002
 
 
 namespace charon {
@@ -13,6 +19,7 @@ enum RaftNodeState {
   CANDIDATE = 2,
   LEADER = 3
 };
+
 
 class RaftNode {
 
@@ -29,6 +36,8 @@ class RaftNode {
   static RaftNode* GetRaftNode();
 
   void init();
+
+  void execute(const std::string& cmd);
 
  public:
   // deal askVote RPC
@@ -67,6 +76,9 @@ class RaftNode {
 
   void setState(RaftNodeState state);
 
+  void updateNextIndex(const int& node_id, const int& v);
+  void updateMatchIndex(const int& node_id, const int& v);
+
  // common state of all node
  private:
   // Persistence state, you need store these states before rpc response 
@@ -104,6 +116,10 @@ class RaftNode {
   int m_node_id {0};
   std::string m_node_name;
   std::string m_node_addr;
+
+ private:
+  tinyrpc::CoroutineMutex m_coroutine_mutex;
+
 };
 
 
