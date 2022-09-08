@@ -1,16 +1,10 @@
 syntax = "proto3";
 option cc_generic_services = true;
 
-enum VoteResult {
-  VOTE_UNKNOWN = 0;
-  VOTE_SUCC = 1;
-  VOTE_FAILED = 2;
-};
-
-enum AppendResult {
-  APPEND_UNKNOWN = 0;
-  APPEND_SUCC = 1;
-  APPEND_FAILED = 2;
+enum AcceptResult {
+  ACCEPT_UNKNOWN = 0;
+  ACCEPT_SUCC = 1;
+  ACCEPT_FAIL = 2;
 };
 
 message LogEntry {
@@ -49,7 +43,7 @@ message AskVoteResponse {
   // current term
   int32 term = 3;
   // give a vote?
-  VoteResult vote_result = 4;
+  AcceptResult accept_result = 4;
   // why not vote
   string vote_fail_reason = 5;
 
@@ -99,7 +93,7 @@ message AppendLogEntriesResponse {
   int32 term = 3;
 
   // append succ?
-  AppendResult append_result = 4;
+  AcceptResult accept_result = 4;
   // reason of append log why failed
   string append_fail_reason = 5;
 

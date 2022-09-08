@@ -1,6 +1,7 @@
 #include <vector>
 #include <tinyxml/tinyxml.h>
 #include <string>
+#include <atomic>
 #include "tinyrpc/comm/log.h"
 #include "tinyrpc/comm/start.h"
 #include "tinyrpc/net/tinypb/tinypb_rpc_async_channel.h"
@@ -14,9 +15,57 @@
 #include "charon/comm/util.h"
 
 
+#define CALL_RAFT_RPCS(REQUEST, RESPONSE, METHOD)                                                                 \
+  tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();                                        \
+  std::atomic_int succ_nodes {1};                                                                                 \
+  std::atomic_int res_nodes {0};                                                                                  \
+  std::atomic_bool need_resume {true};                                                                            \
+  for (size_t i = 0; i < rpc_list.size(); ++i) {                                                                  \
+    std::shared_ptr<REQUEST> request = rpc_list[i].first;                                                         \
+    std::shared_ptr<RESPONSE> response = rpc_list[i].second;                                                      \
+    tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel =                                                             \
+      std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(std::make_shared<tinyrpc::IPAddress>(m_nodes[i]["addr"])); \
+    tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();          \
+    tinyrpc::TinyPbRpcClosure::ptr closure = std::make_shared<tinyrpc::TinyPbRpcClosure>(                         \
+      [&succ_nodes, &res_nodes, response, rpc_controller, cur_cor, &need_resume]() mutable {                      \
+        res_nodes++;                                                                                              \
+        auto res = response.get();                                                                                \
+        response.reset();                                                                                         \
+        auto controller = rpc_controller.get();                                                                   \
+        rpc_controller.reset();                                                                                   \
+        if (controller->ErrorCode() ==0 &&                                                                        \
+          res->ret_code() == 0 && res->accept_result() == ACCEPT_SUCC) {                                          \
+          succ_nodes++;                                                                                           \
+          if (succ_nodes >= GetMostNodeCount()) {                                                                 \
+            AppInfoLog << "receive most succ response, resume";                                                   \
+            if (need_resume.exchange(false)) {                                                                    \
+              tinyrpc::Coroutine::Resume(cur_cor);                                                                \
+            }                                                                                                     \
+            return;                                                                                               \
+          }                                                                                                       \
+        }                                                                                                         \
+        if (res_nodes == GetNodeCount()) {                                                                        \
+          if (need_resume.exchange(false)) {                                                                      \
+            tinyrpc::Coroutine::Resume(cur_cor);                                                                  \
+          }                                                                                                       \
+        }                                                                                                         \
+      }                                                                                                           \
+    );                                                                                                            \
+    rpc_controller->SetTimeout(2000);                                                                             \
+    rpc_channel->saveCallee(rpc_controller, request, response, closure);                                          \
+    RaftService_Stub stub(rpc_channel.get());                                                                     \
+    AppInfoLog << #METHOD << " request to raft node[" << m_nodes[i]["addr"] << ", " << m_nodes[i]["name"] << "]"; \
+    stub.METHOD(rpc_controller.get(), request.get(), response.get(), closure.get());                              \
+  }                                                                                                               \
+  tinyrpc::Coroutine::Yield();                                                                                    \
+
+
+
 namespace charon {
 
 static thread_local RaftNode* t_raft_node = NULL;
+
+int RaftNode::m_node_count = 0;
 
 RaftNode::RaftNode() {
   // log at index 0 is not use
@@ -79,10 +128,10 @@ void RaftNode::FollewerToCandidate() {
 
 void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& response) {
   response.set_term(m_current_term);
-  response.set_vote_result(VOTE_FAILED);
+  response.set_accept_result(ACCEPT_FAIL);
 
   if (request.candidate_term() < m_current_term) {
-    response.set_vote_result(VOTE_FAILED);
+    response.set_accept_result(ACCEPT_FAIL);
     response.set_vote_fail_reason(formatString("AskVote failed, your's term is less than my term"));
     return;
   }
@@ -91,7 +140,7 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
       AppInfoLog << formatString("AskVote to [%s - %d - %s] succ",
           request.node_addr().c_str(), request.node_id(), request.node_name().c_str());
       m_voted_for_id = request.node_id();
-      response.set_vote_result(VOTE_SUCC);
+      response.set_accept_result(ACCEPT_SUCC);
       m_state = CANDIDATE;
       return;
     }
@@ -100,10 +149,10 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
 
 void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, AppendLogEntriesResponse& response) {
   response.set_term(m_current_term);
-  response.set_append_result(APPEND_FAILED);
+  response.set_accept_result(ACCEPT_FAIL);
   if (request.leader_term() < m_current_term) {
     // return false when leader's term less than current Node's term
-    response.set_append_result(APPEND_FAILED);
+    response.set_accept_result(ACCEPT_FAIL);
     response.set_append_fail_reason("AppendLogEntries failed, leader's term is less than current term");
 
     return;
@@ -114,7 +163,7 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
       || (m_logs[prev_log_index].term() != request.prev_log_term())) {
 
     // return false when Node can't find log match(prev_log_index, prev_log_term) 
-    response.set_append_result(APPEND_FAILED);
+    response.set_accept_result(ACCEPT_FAIL);
     response.set_append_fail_reason(
       formatString("AppendLogEntries failed, Node can't match prev_log_index[%d], prev_log_term[%d]",
         prev_log_index, request.prev_log_term()));
@@ -135,7 +184,7 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
     m_commit_index = std::min(request.leader_commit_index(), (int32_t)m_logs.size());
   }
 
-  response.set_append_result(APPEND_SUCC);
+  response.set_accept_result(ACCEPT_SUCC);
 
 }
 
@@ -174,91 +223,15 @@ int RaftNode::askVote() {
     return -1;
   }
 
-  RaftNode* currentiRaftNode = this;
-  tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();
+  // rpc_controller->SetTimeout(5000);
 
-  // total get votes count, first is 1 (beacsuse give a vote to self)
-  int get_votes = 1;
-
-  // give response node's count
-  int res_nodes = 0;
-
-  for (size_t i = 1; i < m_nodes.size(); ++i) {
-    if ((int)i == m_node_id) {
-      continue;
-    }
-
-    std::shared_ptr<AskVoteRequest> request = std::make_shared<AskVoteRequest>();
-    std::shared_ptr<AskVoteResponse> response = std::make_shared<AskVoteResponse>();
-
-    tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel = 
-      std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(std::make_shared<tinyrpc::IPAddress>(m_nodes[i]["addr"]));
-
-    tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
-
-    tinyrpc::TinyPbRpcClosure::ptr closure = std::make_shared<tinyrpc::TinyPbRpcClosure>(
-      [&get_votes, &res_nodes, request, response, rpc_controller, cur_cor, currentiRaftNode]() mutable {
-        res_nodes++;
-        // if call resume, there's request will not deconstruct, it cause memory leak
-        // we just need get normal point there
-        auto req = request.get();
-        request.reset();
-        auto res = response.get();
-        response.reset();
-        auto controller = rpc_controller.get();
-        rpc_controller.reset();
-
-        if (controller->ErrorCode() ==0 &&
-          res->ret_code() == 0 && res->vote_result() == VOTE_SUCC) {
-          AppInfoLog << formatString("[Term: %d][%s - %d - %s] receive a vote from [%s - %d - %s]",
-            req->candidate_term(), req->node_addr().c_str(), req->node_id(), req->node_name().c_str(),
-            res->node_addr().c_str(), res->node_id(), res->node_name().c_str());
-
-          get_votes++;
-          if (get_votes >= currentiRaftNode->getMostNodeCount()) {
-            AppInfoLog << formatString("[Term: %d][%s - %d - %s] receive more than half votes, resume ",
-              req->candidate_term(), req->node_addr().c_str(), req->node_id(), req->node_name().c_str());
-
-            tinyrpc::Coroutine::Resume(cur_cor);
-            return;
-          }
-        }
-        if (res_nodes + 1 == currentiRaftNode->getNodeCount()) {
-          // the last node response, also resume
-          tinyrpc::Coroutine::Resume(cur_cor);
-        }
-      }
-    );
-
-    rpc_controller->SetTimeout(5000);
-
-    request->set_candidate_id(m_node_id);
-    request->set_candidate_term(m_current_term);
-    request->set_last_log_index(m_logs.size() - 1);
-    request->set_last_log_term(m_logs[m_logs.size() - 1].term());
-    request->set_node_id(m_node_id);
-    request->set_node_addr(m_node_addr);
-    request->set_node_name(m_node_name);
-
-    rpc_channel->saveCallee(rpc_controller, request, response, closure);
-
-    RaftService_Stub stub(rpc_channel.get());
-    AppInfoLog << "now askVote request to raft node[" << m_nodes[i]["addr"] << ", " << m_nodes[i]["name"] << "]";
-    stub.AskVote(rpc_controller.get(), request.get(), response.get(), closure.get());
-  }
-
-  // pending, will be resume by two ways
-  // 1. more than half node give votes to this raft node
-  // 2. all nodes already response
-  // 3. receive AppendLogEntries req from higher term raft node
-  tinyrpc::Coroutine::Yield();
-
-
-  if (get_votes >= GetRaftNode()->getMostNodeCount()) {
-    AppInfoLog << formatString("[Term: %d][%s - %d - %s] receive most node votes, now resume coroutine, ready to become leader node",
-      m_current_term, m_node_addr.c_str(), m_node_id, m_node_name.c_str());
-    return 0;
-  }
+  // request->set_candidate_id(m_node_id);
+  // request->set_candidate_term(m_current_term);
+  // request->set_last_log_index(m_logs.size() - 1);
+  // request->set_last_log_term(m_logs[m_logs.size() - 1].term());
+  // request->set_node_id(m_node_id);
+  // request->set_node_addr(m_node_addr);
+  // request->set_node_name(m_node_name);
 
   return -1;
 
@@ -270,84 +243,13 @@ int RaftNode::appendLogEntries() {
       m_current_term, m_node_addr.c_str(), m_node_id, m_node_name.c_str());
     return -1;
   }
-
-  RaftNode* currentiRaftNode = this;
-  tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();
-
-  // total get votes count, first is 1 (beacsuse give a vote to self)
-  int appsucc_counts = 1;
-
-  // give response node's count
-  int res_nodes = 0;
-
+  std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>> rpc_list;
   for (size_t i = 1; i < m_nodes.size(); ++i) {
     if ((int)i == m_node_id) {
       continue;
     }
-
-    std::shared_ptr<AppendLogEntriesRequest> request = std::make_shared<AppendLogEntriesRequest>();
-    std::shared_ptr<AppendLogEntriesResponse> response = std::make_shared<AppendLogEntriesResponse>();
-
-    tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel = 
-      std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(std::make_shared<tinyrpc::IPAddress>(m_nodes[i]["addr"]));
-
-    tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
-
-    rpc_controller->SetTimeout(5000);
-
-
-    tinyrpc::TinyPbRpcClosure::ptr closure = std::make_shared<tinyrpc::TinyPbRpcClosure>(
-      [&appsucc_counts, &res_nodes, request, response, rpc_controller, cur_cor, currentiRaftNode, i]() mutable {
-        res_nodes++;
-        // if call resume, there's request will not deconstruct, it cause memory leak
-        // we just need get normal point there
-        auto req = request.get();
-        request.reset();
-        auto res = response.get();
-        response.reset();
-        auto controller = rpc_controller.get();
-        rpc_controller.reset();
-
-        if (controller->ErrorCode() == 0 && res->ret_code() == 0) {
-          if (res->append_result() == APPEND_SUCC) {
-
-            AppInfoLog << formatString("[Term: %d][%s - %d - %s] receive a success append Log from [%s - %d - %s]",
-              req->leader_term(), req->node_addr().c_str(), req->node_id(), req->node_name().c_str(),
-              res->node_addr().c_str(), res->node_id(), res->node_name().c_str());
-
-            if (req->last_log_index() != 0) {
-              currentiRaftNode->updateNextIndex(i, req->last_log_index() + 1);
-              currentiRaftNode->updateMatchIndex(i, req->last_log_index());
-            }
-            appsucc_counts++;
-            if (appsucc_counts >= currentiRaftNode->getMostNodeCount()) {
-              AppInfoLog << formatString("[Term: %d][%s - %d - %s] receive more than half append Log, resume ",
-                req->leader_term(), req->node_addr().c_str(), req->node_id(), req->node_name().c_str());
-
-              tinyrpc::Coroutine::Resume(cur_cor);
-              return;
-            }
-          } else if (res->append_result() == APPEND_FAILED) {
-
-            AppInfoLog << formatString("[Term: %d][%s - %d - %s] receive a failed append Log from [%s - %d - %s], fail_reason[%d: %s]",
-              req->leader_term(), req->node_addr().c_str(), req->node_id(), req->node_name().c_str(),
-              res->node_addr().c_str(), res->node_id(), res->node_name().c_str(), res->append_fail_code(), res->append_fail_reason().c_str());
-
-            // if follower reply can't match preindex
-            if (res->append_fail_code() == ERR_NOT_MATCH_PREINDEX) {
-              currentiRaftNode->updateNextIndex(i, res->need_index());
-            } else if (res->append_fail_code() == ERR_TERM_MORE_THAN_LEADER) {
-              // should resume coroutine, because this node maybe not real leader, a new leader have be elected
-              tinyrpc::Coroutine::Resume(cur_cor);
-            }
-          }
-        }
-        if (res_nodes + 1 == currentiRaftNode->getNodeCount()) {
-          // the last node response, also resume
-          tinyrpc::Coroutine::Resume(cur_cor);
-        }
-      }
-    );
+    std::shared_ptr<AppendLogEntriesRequest> request;
+    std::shared_ptr<AppendLogEntriesResponse> response;
 
     request->set_leader_term(m_current_term);
     request->set_leader_id(m_node_id);
@@ -382,36 +284,60 @@ int RaftNode::appendLogEntries() {
       request->mutable_log_entries()->CopyFrom({m_logs.begin() + s, m_logs.end()});
       request->set_last_log_index(m_logs[last_index].index());
     }
-
-    rpc_channel->saveCallee(rpc_controller, request, response, closure);
-    RaftService_Stub stub(rpc_channel.get());
-    AppInfoLog << "now appendLogEntries request to raft node[" << m_nodes[i]["addr"] << ", " << m_nodes[i]["name"] << "]";
-    stub.AppendLogEntries(rpc_controller.get(), request.get(), response.get(), closure.get());
+    rpc_list.emplace_back(std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>(request, response));
   }
 
-  // pending, will be resume by two ways
-  // 1. more than half node give votes to this raft node
-  // 2. all nodes already response
-  // 3. receive AppendLogEntries req from higher term raft node
-  tinyrpc::Coroutine::Yield();
+    // request->set_leader_term(m_current_term);
+    // request->set_leader_id(m_node_id);
 
+    // int last_index = m_logs.size() - 1;
+ 
+    // request->set_leader_commit_index(m_commit_index);
+    // request->set_node_id(m_node_id);
+    // request->set_node_addr(m_node_addr);
+    // request->set_node_name(m_node_name);
 
-  if (appsucc_counts >= getMostNodeCount()) {
-    AppInfoLog << formatString("[Term: %d][%s - %d - %s] receive most node append log success, now can commit log",
-      m_current_term, m_node_addr.c_str(), m_node_id, m_node_name.c_str());
-    return 0;
-  }
+    // if (m_logs[last_index].term() != m_current_term) {
+    //   // if the last log is't current term, can't directlt commit
+    //   // add a empty_log at current term
+    //   last_index++;
+    //   LogEntry empty_log;
+    //   empty_log.set_term(m_current_term);
+    //   empty_log.set_index(last_index);
+    //   empty_log.set_cmd("");
+    //   m_logs.push_back(std::move(empty_log));
+    // }
 
-  return -1;
+    // int s = m_next_indexs[i];
+    // if (s >= 1 && s < (int)m_logs.size()) {
+    //   if (s > 1) {
+    //     request->set_prev_log_index(m_logs[s - 1].index());
+    //     request->set_prev_log_term(m_logs[s - 1].term());
+    //   } else {
+    //     request->set_prev_log_index(0);
+    //     request->set_prev_log_term(0);
+    //   }
+    //   request->mutable_log_entries()->CopyFrom({m_logs.begin() + s, m_logs.end()});
+    //   request->set_last_log_index(m_logs[last_index].index());
+    // }
+  
+  return 0;
 }
 
+void RaftNode::AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list) {
+  CALL_RAFT_RPCS(AskVoteRequest, AskVoteResponse, AskVote);
+}
 
-int RaftNode::getNodeCount() {
+void RaftNode::AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list) {
+  CALL_RAFT_RPCS(AppendLogEntriesRequest, AppendLogEntriesResponse, AppendLogEntries);
+}
+
+int RaftNode::GetNodeCount() {
   return m_node_count;
 }
 
 // get more than half nodes count
-int RaftNode::getMostNodeCount() {
+int RaftNode::GetMostNodeCount() {
   return m_node_count/2 + 1;
 }
 

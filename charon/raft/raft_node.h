@@ -12,6 +12,7 @@
 #define ERR_NOT_MATCH_PREINDEX 80000002
 
 
+
 namespace charon {
 
 enum RaftNodeState {
@@ -67,10 +68,11 @@ class RaftNode {
 
   int appendLogEntries();
 
-  int getNodeCount();
-  
-  // get more than half nodes count
-  int getMostNodeCount();
+  static void AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list);
+
+  static void AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list);
+
+
 
   RaftNodeState getState();
 
@@ -78,6 +80,12 @@ class RaftNode {
 
   void updateNextIndex(const int& node_id, const int& v);
   void updateMatchIndex(const int& node_id, const int& v);
+
+ public:
+  static int GetNodeCount();
+  
+  // get more than half nodes count
+  static int GetMostNodeCount();
 
  // common state of all node
  private:
@@ -87,12 +95,14 @@ class RaftNode {
   // all logs have already apply to state machine
   std::vector<LogEntry> m_logs;
   
+
+ private:
   // node info about all distributed server 
   // map is used to describe node info
   // key1: "addr" , value1: "127.0.0.1:19999"
   // key2: "name", value2: "xxx"
   // key3: "id", value3: "xxx"
-  std::vector<KVMap> m_nodes;
+  static std::vector<KVMap> m_nodes;
 
  private:
   // volatile state
@@ -111,7 +121,8 @@ class RaftNode {
 
  private:
   RaftNodeState m_state;
-  int m_node_count {0};
+  // total raft node count
+  static int m_node_count;
 
   int m_node_id {0};
   std::string m_node_name;
