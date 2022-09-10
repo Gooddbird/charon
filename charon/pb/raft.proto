@@ -7,6 +7,14 @@ enum AcceptResult {
   ACCEPT_FAIL = 2;
 };
 
+
+enum RaftNodeState {
+  RAFT_UNKNOWN_STATE = 0;
+  RAFT_FOLLOWER_STATE = 1;
+  RAFT_CANDIDATE_STATE = 2;
+  RAFT_LEADER_STATE = 3;
+};
+
 message LogEntry {
   int32 index = 1;
   int32 term = 2;
@@ -56,6 +64,8 @@ message AskVoteResponse {
   string node_addr = 9;
 
   int32 hashid = 10;
+
+  RaftNodeState state = 11;
 };
 
 message AppendLogEntriesRequest {
@@ -110,6 +120,8 @@ message AppendLogEntriesResponse {
   // if can't find match pre_log_index pre_log_term, return the last can match log's index and term
   int32 need_index = 11;
   int32 need_term = 12;
+
+  RaftNodeState state = 13;
 };
 
 service RaftService {

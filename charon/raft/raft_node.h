@@ -15,12 +15,9 @@
 
 namespace charon {
 
-enum RaftNodeState {
-  FOLLOWER = 1,
-  CANDIDATE = 2,
-  LEADER = 3
-};
+std::string LogEntryToString(const LogEntry& log);
 
+std::string StateToString(const RaftNodeState& state);
 
 class RaftNode {
 
@@ -38,7 +35,7 @@ class RaftNode {
 
   void init();
 
-  void execute(const std::string& cmd);
+  int execute(const std::string& cmd);
 
  public:
   // deal askVote RPC
@@ -81,11 +78,14 @@ class RaftNode {
   void updateNextIndex(const int& node_id, const int& v);
   void updateMatchIndex(const int& node_id, const int& v);
 
+  void becomeFollower(int term);
+
  public:
-  static int GetNodeCount();
+  int getNodeCount();
   
   // get more than half nodes count
-  static int GetMostNodeCount();
+  int getMostNodeCount();
+
 
  // common state of all node
  private:
@@ -102,7 +102,8 @@ class RaftNode {
   // key1: "addr" , value1: "127.0.0.1:19999"
   // key2: "name", value2: "xxx"
   // key3: "id", value3: "xxx"
-  static std::vector<KVMap> m_nodes;
+  std::vector<KVMap> m_nodes;
+  int m_node_count;
 
  private:
   // volatile state
@@ -122,7 +123,6 @@ class RaftNode {
  private:
   RaftNodeState m_state;
   // total raft node count
-  static int m_node_count;
 
   int m_node_id {0};
   std::string m_node_name;
