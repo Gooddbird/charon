@@ -42,6 +42,8 @@ message AskVoteRequest {
   // it is a same raft group when hashid is same
   int32 hashid = 8;
 
+  int32 peer_node_id = 9;
+
 };
 
 message AskVoteResponse {
@@ -94,6 +96,8 @@ message AppendLogEntriesRequest {
   int32 hashid = 10;
   // last log index in log_enrties, if appendLog succ, use this value to help update nextIndex and matchIndex
   int32 last_log_index = 11;
+
+  int32 peer_node_id = 12;
 };
 
 message AppendLogEntriesResponse {

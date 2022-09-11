@@ -4,7 +4,7 @@
   <log>
     <!--identify path of log file-->
     <log_path>./</log_path>
-    <log_prefix>test_tinypb_server</log_prefix>
+    <log_prefix>charon2</log_prefix>
 
     <!--identify max size of single log file, MB-->
     <log_max_file_size>5</log_max_file_size>
@@ -49,11 +49,11 @@
 
   
   <raft>
-    <rafe_servers>
+    <raft_servers>
       <node id = "1" addr = "127.0.0.1:30001"></node>
       <node id = "2" addr = "127.0.0.1:30002"></node>
       <node id = "3" addr = "127.0.0.1:30003"></node>
-    </rafe_servers>
+    </raft_servers>
     <raft_conf>
       <elect_timeout>1000</elect_timeout>
     </raft_conf>

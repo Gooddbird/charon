@@ -7,7 +7,6 @@ namespace charon {
 
 AskVoteImpl::AskVoteImpl(const AskVoteRequest* request, AskVoteResponse* response)
   : m_request(request), m_response(response) {
-    AppDebugLog << "AsvVote get request[" << request->ShortDebugString() << "]";
 }
 
 AskVoteImpl::~AskVoteImpl() {

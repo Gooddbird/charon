@@ -23,18 +23,21 @@ namespace charon {
   tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();                                        \
   std::atomic_int res_nodes {1};                                                                                  \
   std::atomic_bool need_resume {true};                                                                            \
-  if ((int)(rpc_list.size()) + 1 != m_node_count) {                                                                \
+  if ((int)(rpc_list.size()) + 1 != m_node_count) {                                                               \
     AppErrorLog << "CALL_RAFT_RPCS Error, rpc_list size is not all nodes count - 1";                              \
     return;                                                                                                       \
   }                                                                                                               \
   for (size_t i = 0; i < rpc_list.size(); ++i) {                                                                  \
     std::shared_ptr<REQUEST> request = rpc_list[i].first;                                                         \
     std::shared_ptr<RESPONSE> response = rpc_list[i].second;                                                      \
+    int id = request->peer_node_id();                                                                                  \
+    printf("id=%d, addr is %s \n", id, m_nodes[id]["addr"].c_str());                                                                 \
+    tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(m_nodes[id]["addr"]);                     \
     tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel =                                                             \
-      std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(std::make_shared<tinyrpc::IPAddress>(m_nodes[i]["addr"])); \
+      std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);                                                     \
     tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();          \
     tinyrpc::TinyPbRpcClosure::ptr closure = std::make_shared<tinyrpc::TinyPbRpcClosure>(                         \
-      [&res_nodes, cur_cor, &need_resume, this]() mutable {                                                             \
+      [&res_nodes, cur_cor, &need_resume, this]() mutable {                                                       \
         res_nodes++;                                                                                              \
         if (res_nodes >= getNodeCount()) {                                                                        \
           if (need_resume.exchange(false)) {                                                                      \
@@ -46,7 +49,7 @@ namespace charon {
     rpc_controller->SetTimeout(2000);                                                                             \
     rpc_channel->saveCallee(rpc_controller, request, response, closure);                                          \
     RaftService_Stub stub(rpc_channel.get());                                                                     \
-    AppInfoLog << #METHOD << " request to raft node[" << m_nodes[i]["addr"] << ", " << m_nodes[i]["name"] << "]"; \
+    AppInfoLog << #METHOD <<" request to raft node["<< m_nodes[id]["addr"] << ", " << m_nodes[id]["name"] << "]"; \
     stub.METHOD(rpc_controller.get(), request.get(), response.get(), closure.get());                              \
   }                                                                                                               \
   tinyrpc::Coroutine::Yield();                                                                                    \
@@ -69,27 +72,26 @@ RaftNode::RaftNode() {
 
   TiXmlElement* node =  tinyrpc::GetConfig()->getXmlNode("raft");
   assert(node != NULL);
-  TiXmlElement* groups_node = node->FirstChildElement("rafe_servers"); 
+  TiXmlElement* groups_node = node->FirstChildElement("raft_servers"); 
   int id = 1;
   for (TiXmlElement* xmlnode = groups_node->FirstChildElement(); xmlnode!= NULL; xmlnode = xmlnode->NextSiblingElement()) {
     KVMap raft_node;
     std::string addr = std::string(xmlnode->Attribute("addr"));
     raft_node["addr"] = addr;
 
-    // int id = std::atoi(xmlnode->Attribute("id"));
     std::string node_name = std::to_string(id) + "-" + std::to_string(tinyrpc::IOThread::GetCurrentIOThread()->getThreadIndex() + 1);
     raft_node["name"] =  node_name;
     raft_node["id"] = id;
 
-    InfoLog << "read raft server conf[" << addr << ":" << node_name << "]";
+    InfoLog << "read raft server conf[" << addr << ", " << node_name << "]";
 
     if (addr == local_addr) {
       m_node_id = id;
       m_node_addr = addr;
       m_node_name = node_name;
-      InfoLog << "read raft server conf[" << addr << ":" << node_name << "]";
+      InfoLog << "my local raft node conf[" << addr << ", " << node_name << "]";
     }
-    m_nodes.push_back(std::move(raft_node));
+    m_nodes[id].swap(raft_node);
     m_match_indexs.push_back(0);
     m_next_indexs.push_back(0);
     id++;
@@ -119,9 +121,9 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
   response.set_state(m_state);
 
   if (request.candidate_term() > m_current_term) {
-    AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] receive high term AskVote request, now to incrase term, change to [%s name: %s, term: %d, state: %s]",
-      m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
-      m_node_addr.c_str(), m_node_name.c_str(), request.candidate_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
+    AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AskVote request, now to incrase term, change to [term: %d, state: %s]",
+      m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str(),
+      request.candidate_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
 
     m_current_term = request.candidate_term();
     m_voted_for_id = 0;
@@ -178,9 +180,9 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
   response.set_state(m_state);
 
   if (request.leader_term() > m_current_term) {
-    AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] receive high term AskVote request, now to incrase term, change to [%s name: %s, term: %d, state: %s]",
-      m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
-      m_node_addr.c_str(), m_node_name.c_str(), request.leader_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
+    AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AppendLogEntriesRequest request, now to incrase term, change to [term: %d, state: %s]",
+      m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str(),
+      request.leader_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
 
     m_current_term = request.leader_term();
     m_voted_for_id = 0;
@@ -272,7 +274,7 @@ int RaftNode::askVote() {
   }
 
   std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>> rpc_list;
-  for (size_t i = 1; i < m_nodes.size(); ++i) {
+  for (int i = 1; i <= m_node_count; ++i) {
     if ((int)i == m_node_id) {
       continue;
     }
@@ -286,6 +288,7 @@ int RaftNode::askVote() {
     request->set_node_id(m_node_id);
     request->set_node_addr(m_node_addr);
     request->set_node_name(m_node_name);
+    request->set_peer_node_id(i);
 
     rpc_list.emplace_back(std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>(request, response));
   }
@@ -301,7 +304,7 @@ int RaftNode::askVote() {
         i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()));
 
       if (succ_count >= getMostNodeCount()) {
-        AppInfoLog << "appendLogEntries succ";
+        AppInfoLog << "AppendLogEntries succ";
         return 0;
       }
     } else {
@@ -332,7 +335,7 @@ int RaftNode::appendLogEntries() {
     return -1;
   }
   std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>> rpc_list;
-  for (size_t i = 1; i < m_nodes.size(); ++i) {
+  for (int i = 1; i <= m_node_count; ++i) {
     if ((int)i == m_node_id) {
       continue;
     }
@@ -344,6 +347,7 @@ int RaftNode::appendLogEntries() {
 
     int last_index = m_logs.size() - 1;
  
+    request->set_peer_node_id(i);
     request->set_leader_commit_index(m_commit_index);
     request->set_node_id(m_node_id);
     request->set_node_addr(m_node_addr);
@@ -461,12 +465,18 @@ void RaftNode::init() {
     int rt = askVote();
     if (rt != 0) {
       // TODO:
+      AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] failed get most node vote",
+        m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str());
+      return;
+    } else {
+      m_state = RAFT_LEADER_STATE;
+      AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] succ get most node vote, elected to leader node",
+        m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str());
+
     }
-    m_state = RAFT_LEADER_STATE;
-    AppInfoLog << formatString("[%s name: %s, term: %s, state: %s] succ get most node vote, elected to leader node",
-      m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state));
   };
 
+  tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToEachThread(cb);
 
   tinyrpc::TimerEvent::ptr event = 
     std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, false, cb);
