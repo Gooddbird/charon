@@ -10,17 +10,20 @@
 #include "tinyrpc/net/tinypb/tinypb_rpc_closure.h"
 #include "tinyrpc/net/tcp/io_thread.h"
 #include "tinyrpc/net/mutex.h"
+#include "tinyrpc/net/timer.h"
 
 #include "charon/raft/raft_node.h"
 #include "charon/pb/raft.pb.h"
 #include "charon/comm/util.h"
 
 
+namespace charon {
+
 #define CALL_RAFT_RPCS(REQUEST, RESPONSE, METHOD)                                                                 \
   tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();                                        \
   std::atomic_int res_nodes {1};                                                                                  \
   std::atomic_bool need_resume {true};                                                                            \
-  if (rpc_list.size() + 1 != m_nodes.size() - 1) {                                                                \
+  if ((int)(rpc_list.size()) + 1 != m_node_count) {                                                                \
     AppErrorLog << "CALL_RAFT_RPCS Error, rpc_list size is not all nodes count - 1";                              \
     return;                                                                                                       \
   }                                                                                                               \
@@ -31,7 +34,7 @@
       std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(std::make_shared<tinyrpc::IPAddress>(m_nodes[i]["addr"])); \
     tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();          \
     tinyrpc::TinyPbRpcClosure::ptr closure = std::make_shared<tinyrpc::TinyPbRpcClosure>(                         \
-      [&res_nodes, cur_cor, &need_resume]() mutable {                                                             \
+      [&res_nodes, cur_cor, &need_resume, this]() mutable {                                                             \
         res_nodes++;                                                                                              \
         if (res_nodes >= getNodeCount()) {                                                                        \
           if (need_resume.exchange(false)) {                                                                      \
@@ -49,15 +52,13 @@
   tinyrpc::Coroutine::Yield();                                                                                    \
 
 
-namespace charon {
 
 static RaftNodeContainer* g_raft_container = NULL;
 
 RaftNode::RaftNode() {
   // log at index 0 is not use
   m_logs.emplace_back(LogEntry());
-  // m_nodes.resize(100);
-  m_nodes.push_back(-1);
+  m_nodes.resize(100);
   m_match_indexs.push_back(-1);
   m_next_indexs.push_back(-1);
 
@@ -94,6 +95,9 @@ RaftNode::RaftNode() {
     id++;
     m_node_count++;
   }
+  TiXmlElement* conf_node = node->FirstChildElement("raft_conf");
+  assert(conf_node);
+  m_elect_overtime = std::atoi(conf_node->FirstChildElement("elect_timeout")->GetText());
 
 }
 
@@ -101,10 +105,7 @@ RaftNode::~RaftNode() {
 
 }
 
-
-
 void RaftNode::FollewerToCandidate() {
-
 
 }
 
@@ -179,9 +180,9 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
   if (request.leader_term() > m_current_term) {
     AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] receive high term AskVote request, now to incrase term, change to [%s name: %s, term: %d, state: %s]",
       m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
-      m_node_addr.c_str(), m_node_name.c_str(), request.candidate_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
+      m_node_addr.c_str(), m_node_name.c_str(), request.leader_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
 
-    m_current_term = request.candidate_term();
+    m_current_term = request.leader_term();
     m_voted_for_id = 0;
     m_state = RAFT_FOLLOWER_STATE;
   }
@@ -258,6 +259,12 @@ int RaftNode::applyToStateMachine(const LogEntry& logs) {
 }
 
 int RaftNode::askVote() {
+
+  m_state = RAFT_CANDIDATE_STATE;
+  // first add current term
+  m_current_term++;
+  // give vote to self
+  m_voted_for_id = m_node_id; 
   if (m_state != RAFT_CANDIDATE_STATE) {
     AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] state isn't CANDIDATE, can't askVote",
       m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str());
@@ -269,8 +276,8 @@ int RaftNode::askVote() {
     if ((int)i == m_node_id) {
       continue;
     }
-    std::shared_ptr<AskVoteRequest> request;
-    std::shared_ptr<AskVoteResponse> response;
+    std::shared_ptr<AskVoteRequest> request = std::make_shared<AskVoteRequest>();
+    std::shared_ptr<AskVoteResponse> response = std::make_shared<AskVoteResponse>();
 
     request->set_candidate_id(m_node_id);
     request->set_candidate_term(m_current_term);
@@ -299,13 +306,12 @@ int RaftNode::askVote() {
       }
     } else {
       if (i.second->accept_result() == ACCEPT_FAIL) {
-        AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] failed apply log[%s] to node[%s name: %s, term: %s, state: %s], faild reason[%d, %s]",
+        AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] failed get vote from node[%s name: %s, term: %s, state: %s], faild reason[%d, %s]",
           m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state),
-          LogEntryToString(m_logs[match_index]).c_str(), 
           i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()).c_str(),
-          i.second->append_fail_code(), i.second->append_fail_reason().c_str());
+          i.second->vote_fail_code(), i.second->vote_fail_reason().c_str());
 
-        if (i.second->append_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < i.second->term()) {
+        if (i.second->vote_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < i.second->term()) {
           // TODO: become to follewer
           becomeFollower(i.second->term());
           return -1;
@@ -330,8 +336,8 @@ int RaftNode::appendLogEntries() {
     if ((int)i == m_node_id) {
       continue;
     }
-    std::shared_ptr<AppendLogEntriesRequest> request;
-    std::shared_ptr<AppendLogEntriesResponse> response;
+    std::shared_ptr<AppendLogEntriesRequest> request = std::make_shared<AppendLogEntriesRequest>();
+    std::shared_ptr<AppendLogEntriesResponse> response = std::make_shared<AppendLogEntriesResponse>();
 
     request->set_leader_term(m_current_term);
     request->set_leader_id(m_node_id);
@@ -451,18 +457,20 @@ void RaftNode::setState(RaftNodeState state) {
 
 
 void RaftNode::init() {
-  charon::RaftNode* node = charon::RaftNode::GetRaftNode();
-  m_state = RAFT_CANDIDATE_STATE;
+  auto cb = [this]() {
+    int rt = askVote();
+    if (rt != 0) {
+      // TODO:
+    }
+    m_state = RAFT_LEADER_STATE;
+    AppInfoLog << formatString("[%s name: %s, term: %s, state: %s] succ get most node vote, elected to leader node",
+      m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state));
+  };
 
-  // first add current term
-  m_current_term++;
-  // give vote to self
-  m_voted_for_id = m_node_id; 
 
-  AppDebugLog << formatString("[%s name: %s, term: %s, state: %s] succ apply log[last log index: %d] to node[%s name: %s, term: %s, state: %s]",
-    m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state));
-
-  node->askVote();
+  tinyrpc::TimerEvent::ptr event = 
+    std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, false, cb);
+  tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(event);
 
 }
 
@@ -534,7 +542,7 @@ RaftNodeContainer::~RaftNodeContainer() {
 
 }
 
-RaftNodeContainer::getRaftNode(int hash_id) {
+RaftNode* RaftNodeContainer::getRaftNode(int hash_id) {
   return m_container[0];
 }
 
@@ -542,8 +550,8 @@ RaftNodeContainer* RaftNodeContainer::GetRaftNodeContainer() {
   if (g_raft_container) {
     return g_raft_container;
   }
-  g_raft_containe = new RaftNodeContainer();
-  return g_raft_containe;
+  g_raft_container = new RaftNodeContainer();
+  return g_raft_container;
 }
 
 }

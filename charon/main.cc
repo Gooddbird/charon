@@ -5,13 +5,19 @@
 #include "charon/raft/raft_node.h"
 
 int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    printf("Start charon server error, input argc is not 2!");
+    printf("Start charon server like this: \n");
+    printf("./charon xxx.xml\n");
+    return 0;
+  }
 
-  tinyrpc::InitConfig("../conf/charon.xml");
+  tinyrpc::InitConfig(argv[1]);
 
-  // tinyrpc::GetServer()->registerService(std::make_shared<charon::Charon>());
-  tinyrpc::GetServer()->registerService(std::make_shared<charon::Raft>());
+  REGISTER_SERVICE(charon::Raft);
+
   auto cb = []() {
-
+    charon::RaftNodeContainer::GetRaftNodeContainer()->getRaftNode(0)->init();
   };
   tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToEachThread(cb);
 

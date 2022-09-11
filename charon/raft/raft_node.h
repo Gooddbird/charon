@@ -65,9 +65,9 @@ class RaftNode {
 
   int appendLogEntries();
 
-  static void AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list);
+  void AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list);
 
-  static void AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list);
+  void AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list);
 
 
 
@@ -103,7 +103,7 @@ class RaftNode {
   // key2: "name", value2: "xxx"
   // key3: "id", value3: "xxx"
   std::vector<KVMap> m_nodes;
-  int m_node_count;
+  int m_node_count {0};
 
  private:
   // volatile state
@@ -128,6 +128,7 @@ class RaftNode {
   std::string m_node_name;
   std::string m_node_addr;
 
+  int m_elect_overtime {0};     // ms, the overtime of election progress
  private:
   tinyrpc::CoroutineMutex m_coroutine_mutex;
 
@@ -147,6 +148,7 @@ class RaftNodeContainer {
  private:
   std::vector<RaftNode*> m_container;
   int m_size {0};
+
 };
 
 }

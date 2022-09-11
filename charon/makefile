@@ -25,9 +25,9 @@ CXX_FLAGS := -g -O3 -std=c++11 -Wall -Wno-deprecated -Wno-unused-but-set-variabl
 
 CXX_FLAGS += -I $(PATH_TINYRPC) -I../ -I ./$(PATH_PB) -I ./$(PATH_SERVICE) -I ./$(PATH_INTERFACE) -I ./$(PATH_DATA) -I ./$(PATH_COMM)
 
-LIBS += /usr/lib/libprotobuf.a /usr/lib/libtinyxml.a
-
 LIBS += $(TINYRPC_LIB)
+
+LIBS += /usr/lib/libprotobuf.a /usr/lib/libtinyxml.a
 
 PB_OBJS := $(patsubst $(PATH_PB)/%.cc, $(PATH_PB)/%.o, $(wildcard $(PATH_PB)/*.cc))
 RAFT_OBJS := $(patsubst $(PATH_RAFT)/%.cc, $(PATH_RAFT)/%.o, $(wildcard $(PATH_RAFT)/*.cc))
@@ -39,8 +39,8 @@ COMM_OBJS := $(patsubst $(PATH_COMM)/%.cc, $(PATH_COMM)/%.o, $(wildcard $(PATH_C
 
 OUT : $(TARGET)
 
-$(TARGET) : $(PB_OBJS) $(SERVICE_OBJS) $(INTERFACE_OBJS) $(DATA_OBJS) $(COMM_OBJS) $(RAFT_OBJS)
-	$(CXX) $(CXX_FLAGS) -o $@ $(LIBS) -ldl -lpthread
+$(TARGET) : $(PB_OBJS) $(COMM_OBJS) $(SERVICE_OBJS) $(INTERFACE_OBJS) $(DATA_OBJS) $(RAFT_OBJS)
+	$(CXX) $(CXX_FLAGS) main.cc -o $@ $^ $(LIBS) -ldl -lpthread
 
 $(PATH_PB)/%.o : $(PATH_PB)/%.cc
 	$(CXX) $(CXX_FLAGS) -c $< -o $@

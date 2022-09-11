@@ -54,5 +54,8 @@
       <node id = "2" addr = "127.0.0.1:30002"></node>
       <node id = "3" addr = "127.0.0.1:30003"></node>
     </rafe_servers>
+    <raft_conf>
+      <elect_timeout>1000</elect_timeout>
+    </raft_conf>
   </raft>
 </root>

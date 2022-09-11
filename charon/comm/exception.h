@@ -3,6 +3,8 @@
 
 #include <exception>
 #include <string>
+#include <memory>
+#include "tinyrpc/comm/log.h"
 
 
 namespace charon {
@@ -10,18 +12,29 @@ namespace charon {
 class CharonException : public std::exception {
  public:
 
-  template<typename... Args>
-  CharonException(long long code, const char* str, Args&&... args); 
-  ~CharonException();
+  CharonException(long long code, const std::string& err_info) {
+    m_error_code = code;
+    AppInfoLog << "throw CharonException: {code: " << m_error_code << ", errinfo:" << m_error_info << "}";
+  }
 
-  const char* what();
+  ~CharonException() {
+  
+  }
 
-  std::string error();
+  const char* what() {
+    return m_error_info.c_str();
+  }
 
-  long long code();
+  std::string error() {
+    return m_error_info;
+  }
+
+  long long code() {
+    return m_error_code;
+  }
 
  private:
-  long long m_error_code = 0;
+  long long m_error_code {0};
   std::string m_error_info;
 
 };
