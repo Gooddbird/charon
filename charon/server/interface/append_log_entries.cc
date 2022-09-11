@@ -5,6 +5,7 @@
 #include "charon/server/data/data_manager.h"
 #include "charon/comm/errcode.h"
 #include "charon/comm/exception.h"
+#include "charon/raft/raft_node.h"
 
 namespace charon {
 
@@ -24,31 +25,14 @@ void AppendLogEntriesImpl::run() {
 
 }
 
-bool AppendLogEntriesImpl::executeInCurrentThread() {
-  // m_current_thread_hash = tinyrpc::IOThread::GetCurrentIOThread()->getThreadIndex();
-  // m_to_thread_hash = m_request->thread_hash();
-  // return m_current_thread_hash == m_to_thread_hash;
-  return true;
-}
 
 void AppendLogEntriesImpl::checkInput() {
-  // int pool_size = tinyrpc::GetIOThreadPoolSize();
-  // if (m_to_thread_hash >= pool_size || m_to_thread_hash < 0) {
-  //   throw CharonException(ERROR_INVALID_THREAD_HASH, "invalid thread hash {%d}", m_request->thread_hash());
-  // }
+
 }
 
 void AppendLogEntriesImpl::execute() {
-  if (executeInCurrentThread()) {
-
-  } else {
-
-  }
+  RaftNodeContainer::GetRaftNodeContainer()->getRaftNode(0)->handleAppendLogEntries(*m_request, *m_response);
 }
 
-
-void AppendLogEntriesImpl::checkTerm() {
-
-}
 
 }

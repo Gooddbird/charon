@@ -51,15 +51,7 @@
 
 namespace charon {
 
-static thread_local RaftNode* t_raft_node = NULL;
-
-RaftNode* RaftNode::GetRaftNode() {
-  if (t_raft_node) {
-    return t_raft_node;
-  }
-  t_raft_node = new RaftNode();
-  return t_raft_node;
-}
+static RaftNodeContainer* g_raft_container = NULL;
 
 RaftNode::RaftNode() {
   // log at index 0 is not use
@@ -70,6 +62,7 @@ RaftNode::RaftNode() {
   m_next_indexs.push_back(-1);
 
   m_current_term = 0;
+  m_voted_for_id = 0;
   m_state = RAFT_FOLLOWER_STATE;
   std::string local_addr = tinyrpc::GetServer()->getLocalAddr()->toString();
 
@@ -118,41 +111,99 @@ void RaftNode::FollewerToCandidate() {
 void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& response) {
   response.set_term(m_current_term);
   response.set_accept_result(ACCEPT_FAIL);
+  response.set_vote_fail_code(0);
+  response.set_node_id(m_node_id);
+  response.set_node_name(m_node_name);
+  response.set_node_addr(m_node_addr);
+  response.set_state(m_state);
+
+  if (request.candidate_term() > m_current_term) {
+    AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] receive high term AskVote request, now to incrase term, change to [%s name: %s, term: %d, state: %s]",
+      m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
+      m_node_addr.c_str(), m_node_name.c_str(), request.candidate_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
+
+    m_current_term = request.candidate_term();
+    m_voted_for_id = 0;
+    m_state = RAFT_FOLLOWER_STATE;
+  }
 
   if (request.candidate_term() < m_current_term) {
     response.set_accept_result(ACCEPT_FAIL);
-    response.set_vote_fail_reason(formatString("AskVote failed, your's term is less than my term"));
+    response.set_vote_fail_reason(formatString("AskVote failed, your's term[%d] is less than my term[%d]", 
+      request.candidate_term(), m_current_term));
+    response.set_vote_fail_code(ERR_TERM_MORE_THAN_CANDICATE);
     return;
   }
+
+  bool is_vote = false;
   if (m_voted_for_id == 0 || m_voted_for_id == request.candidate_id()) {
-    if (request.last_log_index() >= (int32_t)m_logs.size()) {
-      AppInfoLog << formatString("AskVote to [%s - %d - %s] succ",
-          request.node_addr().c_str(), request.node_id(), request.node_name().c_str());
-      m_voted_for_id = request.node_id();
-      response.set_accept_result(ACCEPT_SUCC);
-      m_state = RAFT_CANDIDATE_STATE;
+    LogEntry last_log = m_logs[m_logs.size() - 1];
+    if (request.last_log_term() > last_log.term()) {
+      is_vote = true;
+      AppInfoLog << formatString("AskVote req's last_log_term[%d] > current last_log_term[%d], vote to it",
+        request.last_log_term(), last_log.term());
+
+    } else if (request.last_log_term() == last_log.term() && request.last_log_index() >= last_log.index()) {
+      AppInfoLog << formatString("AskVote req's last_log_index[%d] >= current last_log_index[%d], vote to it",
+        request.last_log_index(), last_log.index());
+      is_vote = true;
+
+    } else {
+      // exception case
+      response.set_accept_result(ACCEPT_FAIL);
+      response.set_vote_fail_code(ERR_LOG_MORE_THAN_CANDIDATE);
+      response.set_vote_fail_reason(formatString("current log[term: %d, index: %d] is new than yours log[term: %d, index: %d]", 
+        last_log.term(), last_log.index(), request.last_log_term(), request.last_log_index()));
+
       return;
     }
+
+  }
+  if (is_vote) {
+    m_voted_for_id = request.node_id();
+    response.set_accept_result(ACCEPT_SUCC);
+    m_state = RAFT_CANDIDATE_STATE;
   }
 }
 
 void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, AppendLogEntriesResponse& response) {
   response.set_term(m_current_term);
   response.set_accept_result(ACCEPT_FAIL);
+  response.set_term(m_current_term);
+  response.set_append_fail_code(0);
+  response.set_node_id(m_node_id);
+  response.set_node_name(m_node_name);
+  response.set_node_addr(m_node_addr);
+  response.set_state(m_state);
+
+  if (request.leader_term() > m_current_term) {
+    AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] receive high term AskVote request, now to incrase term, change to [%s name: %s, term: %d, state: %s]",
+      m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
+      m_node_addr.c_str(), m_node_name.c_str(), request.candidate_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
+
+    m_current_term = request.candidate_term();
+    m_voted_for_id = 0;
+    m_state = RAFT_FOLLOWER_STATE;
+  }
+
   if (request.leader_term() < m_current_term) {
     // return false when leader's term less than current Node's term
     response.set_accept_result(ACCEPT_FAIL);
-    response.set_append_fail_reason("AppendLogEntries failed, leader's term is less than current term");
+    response.set_append_fail_code(ERR_TERM_MORE_THAN_LEADER);
+    response.set_append_fail_reason(formatString("AppendLogEntries failed, leader's term[%d] is less than current term[%d]",
+      request.leader_term(), m_current_term));
 
     return;
   }
 
   int prev_log_index = request.prev_log_index();
   if ((prev_log_index >= (int)m_logs.size())
-      || (m_logs[prev_log_index].term() != request.prev_log_term())) {
+      || (m_logs[prev_log_index].term() != request.prev_log_term())
+      || (m_logs[prev_log_index].index() != request.prev_log_index())) {
 
     // return false when Node can't find log match(prev_log_index, prev_log_term) 
     response.set_accept_result(ACCEPT_FAIL);
+    response.set_append_fail_code(ERR_NOT_MATCH_PREINDEX);
     response.set_append_fail_reason(
       formatString("AppendLogEntries failed, Node can't match prev_log_index[%d], prev_log_term[%d]",
         prev_log_index, request.prev_log_term()));
@@ -170,7 +221,7 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
   }
 
   if (request.leader_commit_index() > m_commit_index) {
-    m_commit_index = std::min(request.leader_commit_index(), (int32_t)m_logs.size());
+    m_commit_index = std::min(request.leader_commit_index(), m_logs[m_logs.size() - 1].index());
   }
 
   response.set_accept_result(ACCEPT_SUCC);
@@ -428,6 +479,7 @@ int RaftNode::execute(const std::string& cmd) {
   log.set_index(last_index);
   log.set_cmd(cmd);
   m_logs.push_back(std::move(log));
+  m_match_indexs[m_node_id] = log.index();
 
   int rt = appendLogEntries();
   if (rt != 0) {
@@ -442,7 +494,6 @@ int RaftNode::execute(const std::string& cmd) {
 void RaftNode::updateNextIndex(const int& node_id, const int& v) {
   if (node_id >= 1 && node_id < (int)m_next_indexs.size()) {
     m_next_indexs[node_id] = v;
-
   }
 }
 
@@ -468,6 +519,31 @@ std::string StateToString(const RaftNodeState& state) {
 
 std::string LogEntryToString(const LogEntry& log) {
   return formatString("[term: %d, index: %d, cmd: %s]", log.term(), log.index(), log.cmd().c_str());
+}
+
+
+
+RaftNodeContainer::RaftNodeContainer() {
+  m_size = 1;
+  for (int i = 0; i < m_size; ++i) {
+    m_container.push_back(new RaftNode());
+  }
+}
+
+RaftNodeContainer::~RaftNodeContainer() {
+
+}
+
+RaftNodeContainer::getRaftNode(int hash_id) {
+  return m_container[0];
+}
+
+RaftNodeContainer* RaftNodeContainer::GetRaftNodeContainer() {
+  if (g_raft_container) {
+    return g_raft_container;
+  }
+  g_raft_containe = new RaftNodeContainer();
+  return g_raft_containe;
 }
 
 }

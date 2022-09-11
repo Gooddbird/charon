@@ -14,8 +14,6 @@ class AppendLogEntriesImpl {
 
   void run();
 
-  bool executeInCurrentThread();
-
   void checkInput();
 
   void execute();

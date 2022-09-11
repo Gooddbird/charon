@@ -8,8 +8,10 @@
 
 
 // raft errcode define
-#define ERR_TERM_MORE_THAN_LEADER 80000001
-#define ERR_NOT_MATCH_PREINDEX 80000002
+#define ERR_TERM_MORE_THAN_LEADER 80000001        // current term more than leader' term
+#define ERR_NOT_MATCH_PREINDEX 80000002           // can't find a log match prev_log_index & prev_log_term
+#define ERR_LOG_MORE_THAN_CANDIDATE 80000003      // current log is more new than candidate
+#define ERR_TERM_MORE_THAN_CANDICATE 80000004     // current term more than leader' term
 
 
 
@@ -31,8 +33,6 @@ class RaftNode {
   void FollewerToCandidate();
 
  public:
-  static RaftNode* GetRaftNode();
-
   void init();
 
   int execute(const std::string& cmd);
@@ -140,8 +140,13 @@ class RaftNodeContainer {
   RaftNodeContainer();
   ~RaftNodeContainer();
 
+  RaftNode* getRaftNode(int hash_id);
+
+  static RaftNodeContainer* GetRaftNodeContainer();
+
  private:
   std::vector<RaftNode*> m_container;
+  int m_size {0};
 };
 
 }

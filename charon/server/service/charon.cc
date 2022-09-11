@@ -11,30 +11,30 @@
 #include "tinyrpc/net/tcp/io_thread.h"
 #include "tinyrpc/coroutine/coroutine.h"
 
-#define CALL_CHARON_INTERFACE(type) \
-  type impl(request, response); \
-  response->set_ret_code(0); \
-  response->set_res_info("OK"); \
-  try { \
-    AppInfoLog << "Get request:{" << request->ShortDebugString() << "}"; \
-    impl.run(); \
+#define CALL_CHARON_INTERFACE(type)                                                                                                 \
+  type impl(request, response);                                                                                                     \
+  response->set_ret_code(0);                                                                                                        \
+  response->set_res_info("OK");                                                                                                     \
+  try {                                                                                                                             \
+    AppInfoLog << "Get request:{" << request->ShortDebugString() << "}";                                                            \
+    impl.run();                                                                                                                     \
     AppInfoLog << "Get request:{" << request->ShortDebugString() << "} success, response:{" << response->ShortDebugString() << "}"; \
-  } catch (charon::CharonException& e) { \
-    AppErrorLog << "occur CharonException, error code = " << e.code() << ", errinfo = " << e.error(); \
-    response->set_ret_code(e.code()); \
-    response->set_res_info(e.error()); \
-  } catch (std::exception&) { \
-    AppErrorLog << "occur std::exception, error code = -1, errorinfo = UnKnown error "; \
-    response->set_ret_code(-1); \
-    response->set_res_info("UnKnown error"); \
-  } catch (...) { \
-    AppErrorLog << "occur UnKnown exception, error code = -1, errorinfo = UnKnown error "; \
-    response->set_ret_code(-1); \
-    response->set_res_info("UnKnown error"); \
-  } \
-  if (done) { \
-    done->Run(); \
-  } \
+  } catch (charon::CharonException& e) {                                                                                            \
+    AppErrorLog << "occur CharonException, error code = " << e.code() << ", errinfo = " << e.error();                               \
+    response->set_ret_code(e.code());                                                                                               \
+    response->set_res_info(e.error());                                                                                              \
+  } catch (std::exception&) {                                                                                                       \
+    AppErrorLog << "occur std::exception, error code = -1, errorinfo = UnKnown error ";                                             \
+    response->set_ret_code(-1);                                                                                                     \
+    response->set_res_info("UnKnown error");                                                                                        \
+  } catch (...) {                                                                                                                   \
+    AppErrorLog << "occur UnKnown exception, error code = -1, errorinfo = UnKnown error ";                                          \
+    response->set_ret_code(-1);                                                                                                     \
+    response->set_res_info("UnKnown error");                                                                                        \
+  }                                                                                                                                 \
+  if (done) {                                                                                                                       \
+    done->Run();                                                                                                                    \
+  }                                                                                                                                 \
 
 namespace charon {
 
