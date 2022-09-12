@@ -5,6 +5,7 @@
 #include <map>
 #include "charon/pb/raft.pb.h"
 #include "tinyrpc/net/mutex.h"
+#include "tinyrpc/net/timer.h"
 
 
 // raft errcode define
@@ -33,7 +34,11 @@ class RaftNode {
   void FollewerToCandidate();
 
  public:
-  void init();
+  void resetElectionTimer();
+
+  void startAppendLogHeart();
+
+  void stopAppendLogHeart();
 
   int execute(const std::string& cmd);
 
@@ -44,41 +49,28 @@ class RaftNode {
   // deal appendLogEntries RPC
   void handleAppendLogEntries(const AppendLogEntriesRequest& request, AppendLogEntriesResponse& response);
 
-  // all node execute 
-  void commonHandler();
-
-  // only leader execute
-  void leaderHandler();
-
-  // only follower execute
-  void followerHandler();
-
-  // only candidate execute
-  void candidateHandler();
-
 
  public:
   // apply log to state Machine
   int applyToStateMachine(const LogEntry& logs);
 
-  int askVote();
-
   int appendLogEntries();
+
+  void election();
 
   void AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list);
 
   void AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list);
-
-
 
   RaftNodeState getState();
 
   void setState(RaftNodeState state);
 
   void updateNextIndex(const int& node_id, const int& v);
+
   void updateMatchIndex(const int& node_id, const int& v);
 
-  void becomeFollower(int term);
+  void toFollower(int term);
 
  public:
   int getNodeCount();
@@ -129,8 +121,13 @@ class RaftNode {
   std::string m_node_addr;
 
   int m_elect_overtime {0};     // ms, the overtime of election progress
+  int m_heart_interval {0};     // ms, the interval of leader to send appendLogEntries RPC
+
  private:
   tinyrpc::CoroutineMutex m_coroutine_mutex;
+
+  tinyrpc::TimerEvent::ptr m_election_event {nullptr};
+  tinyrpc::TimerEvent::ptr m_appendlog_event {nullptr};
 
 };
 
@@ -148,6 +145,7 @@ class RaftNodeContainer {
  private:
   std::vector<RaftNode*> m_container;
   int m_size {0};
+
 
 };
 

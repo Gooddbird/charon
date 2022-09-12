@@ -16,9 +16,9 @@
   response->set_ret_code(0);                                                                                                        \
   response->set_res_info("OK");                                                                                                     \
   try {                                                                                                                             \
-    AppInfoLog << "Get request:{" << request->ShortDebugString() << "}";                                                            \
+    AppInfoLog << "request:{" << request->ShortDebugString() << "}";                                                                \
     impl.run();                                                                                                                     \
-    AppInfoLog << "Get request:{" << request->ShortDebugString() << "} success, response:{" << response->ShortDebugString() << "}"; \
+    AppInfoLog << "response:{" << response->ShortDebugString() << "}";                                                              \
   } catch (charon::CharonException& e) {                                                                                            \
     AppErrorLog << "occur CharonException, error code = " << e.code() << ", errinfo = " << e.error();                               \
     response->set_ret_code(e.code());                                                                                               \

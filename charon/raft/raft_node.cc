@@ -100,14 +100,11 @@ RaftNode::RaftNode() {
   TiXmlElement* conf_node = node->FirstChildElement("raft_conf");
   assert(conf_node);
   m_elect_overtime = std::atoi(conf_node->FirstChildElement("elect_timeout")->GetText());
+  m_heart_interval = std::atoi(conf_node->FirstChildElement("heart_interval")->GetText());
 
 }
 
 RaftNode::~RaftNode() {
-
-}
-
-void RaftNode::FollewerToCandidate() {
 
 }
 
@@ -120,22 +117,21 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
   response.set_node_addr(m_node_addr);
   response.set_state(m_state);
 
-  if (request.candidate_term() > m_current_term) {
-    AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AskVote request, now to incrase term, change to [term: %d, state: %s]",
-      m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str(),
-      request.candidate_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
-
-    m_current_term = request.candidate_term();
-    m_voted_for_id = 0;
-    m_state = RAFT_FOLLOWER_STATE;
-  }
-
   if (request.candidate_term() < m_current_term) {
     response.set_accept_result(ACCEPT_FAIL);
     response.set_vote_fail_reason(formatString("AskVote failed, your's term[%d] is less than my term[%d]", 
       request.candidate_term(), m_current_term));
     response.set_vote_fail_code(ERR_TERM_MORE_THAN_CANDICATE);
     return;
+  }
+
+  if (request.candidate_term() > m_current_term) {
+    AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AskVote request, now to incrase term, change to [term: %d, state: %s]",
+      m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str(),
+      request.candidate_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
+
+    toFollower(request.candidate_term());
+    resetElectionTimer();
   }
 
   bool is_vote = false;
@@ -166,6 +162,7 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
     m_voted_for_id = request.node_id();
     response.set_accept_result(ACCEPT_SUCC);
     m_state = RAFT_CANDIDATE_STATE;
+    resetElectionTimer();
   }
 }
 
@@ -179,16 +176,6 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
   response.set_node_addr(m_node_addr);
   response.set_state(m_state);
 
-  if (request.leader_term() > m_current_term) {
-    AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AppendLogEntriesRequest request, now to incrase term, change to [term: %d, state: %s]",
-      m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str(),
-      request.leader_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
-
-    m_current_term = request.leader_term();
-    m_voted_for_id = 0;
-    m_state = RAFT_FOLLOWER_STATE;
-  }
-
   if (request.leader_term() < m_current_term) {
     // return false when leader's term less than current Node's term
     response.set_accept_result(ACCEPT_FAIL);
@@ -198,6 +185,15 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
 
     return;
   }
+
+  if (request.leader_term() > m_current_term) {
+    AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AppendLogEntriesRequest request, now to incrase term, change to [term: %d, state: %s]",
+      m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str(),
+      request.leader_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
+
+    toFollower(request.leader_term());
+  }
+  resetElectionTimer();
 
   int prev_log_index = request.prev_log_index();
   if ((prev_log_index >= (int)m_logs.size())
@@ -231,101 +227,9 @@ void RaftNode::handleAppendLogEntries(const AppendLogEntriesRequest& request, Ap
 
 }
 
-// all Node execute 
-void RaftNode::commonHandler() {
-  for(int i = m_last_applied_index + 1; i <= m_commit_index; ++i) {
-    applyToStateMachine(m_logs[i]);
-    m_last_applied_index++;
-  }
-}
-
-// only leader execute
-void RaftNode::leaderHandler() {
-
-}
-
-// only follower execute
-void RaftNode::followerHandler() {
-
-}
-
-// only candidate execute
-void RaftNode::candidateHandler() {
-
-}
-
-
 
 int RaftNode::applyToStateMachine(const LogEntry& logs) {
   return 0;
-}
-
-int RaftNode::askVote() {
-
-  m_state = RAFT_CANDIDATE_STATE;
-  // first add current term
-  m_current_term++;
-  // give vote to self
-  m_voted_for_id = m_node_id; 
-  if (m_state != RAFT_CANDIDATE_STATE) {
-    AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] state isn't CANDIDATE, can't askVote",
-      m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str());
-    return -1;
-  }
-
-  std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>> rpc_list;
-  for (int i = 1; i <= m_node_count; ++i) {
-    if ((int)i == m_node_id) {
-      continue;
-    }
-    std::shared_ptr<AskVoteRequest> request = std::make_shared<AskVoteRequest>();
-    std::shared_ptr<AskVoteResponse> response = std::make_shared<AskVoteResponse>();
-
-    request->set_candidate_id(m_node_id);
-    request->set_candidate_term(m_current_term);
-    request->set_last_log_index(m_logs.size() - 1);
-    request->set_last_log_term(m_logs[m_logs.size() - 1].term());
-    request->set_node_id(m_node_id);
-    request->set_node_addr(m_node_addr);
-    request->set_node_name(m_node_name);
-    request->set_peer_node_id(i);
-
-    rpc_list.emplace_back(std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>(request, response));
-  }
-
-  AskVoteRPCs(rpc_list);
-
-  int succ_count = 1;
-  for (auto i : rpc_list) {
-    if (i.second->accept_result() == ACCEPT_SUCC) {
-      succ_count++;
-      AppInfoLog << formatString("[%s name: %s, term: %d, state: %s] succ get vote from node[%s name: %s, term: %s, state: %s]",
-        m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state),
-        i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()));
-
-      if (succ_count >= getMostNodeCount()) {
-        AppInfoLog << "AppendLogEntries succ";
-        return 0;
-      }
-    } else {
-      if (i.second->accept_result() == ACCEPT_FAIL) {
-        AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] failed get vote from node[%s name: %s, term: %s, state: %s], faild reason[%d, %s]",
-          m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state),
-          i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()).c_str(),
-          i.second->vote_fail_code(), i.second->vote_fail_reason().c_str());
-
-        if (i.second->vote_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < i.second->term()) {
-          // TODO: become to follewer
-          becomeFollower(i.second->term());
-          return -1;
-        }
-      
-      }
-    }
-  }
-
-  return -1;
-
 }
 
 int RaftNode::appendLogEntries() {
@@ -405,7 +309,7 @@ int RaftNode::appendLogEntries() {
           updateNextIndex(i.first->node_id(), i.second->need_index());
         } else if (i.second->append_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < i.second->term()) {
           // TODO: become to follewer
-          becomeFollower(i.second->term());
+          toFollower(i.second->term());
           return -1;
         }
       }
@@ -426,11 +330,18 @@ int RaftNode::appendLogEntries() {
   return -1;
 }
 
-void RaftNode::becomeFollower(int term) {
+void RaftNode::toFollower(int term) {
+  m_coroutine_mutex.lock();
   AppErrorLog << formatString("[Term: %d][%s - %d - %s] raft node become to follewer [Term: %d, state: %s]",
     m_current_term, m_node_addr.c_str(), m_node_id, m_node_name.c_str(), m_current_term, StateToString(RAFT_FOLLOWER_STATE).c_str());
   m_state = RAFT_FOLLOWER_STATE;
   m_current_term = term;
+  m_voted_for_id = 0;
+
+  m_coroutine_mutex.unlock();
+
+  stopAppendLogHeart();
+  resetElectionTimer();
 }
 
 void RaftNode::AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list) {
@@ -460,28 +371,140 @@ void RaftNode::setState(RaftNodeState state) {
 }
 
 
-void RaftNode::init() {
-  auto cb = [this]() {
-    int rt = askVote();
-    if (rt != 0) {
-      // TODO:
-      AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] failed get most node vote",
-        m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str());
-      return;
-    } else {
-      m_state = RAFT_LEADER_STATE;
-      AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] succ get most node vote, elected to leader node",
-        m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str());
+void RaftNode::resetElectionTimer() {
+  if (!m_election_event) {
+    tinyrpc::Coroutine::ptr cor = tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToRandomThread(
+        [this]() {
+          election();
+        }
+    );
 
+    m_election_event = 
+      std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, false, [cor]() mutable {
+        auto t = cor.get();
+        cor.reset();
+        tinyrpc::Coroutine::Resume(t);
+      });
+
+    tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_election_event);
+  } else {
+    m_election_event->cancle();
+    m_election_event->resetTime();
+  }
+  
+}
+
+void RaftNode::startAppendLogHeart() {
+  if (!m_appendlog_event) {
+    tinyrpc::Coroutine::ptr cor = tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToRandomThread(
+        [this]() {
+          appendLogEntries();
+        }
+    );
+
+    m_appendlog_event = 
+      std::make_shared<tinyrpc::TimerEvent>(m_heart_interval, true, [cor]() mutable {
+        auto t = cor.get();
+        cor.reset();
+        tinyrpc::Coroutine::Resume(t);
+      });
+
+    tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_appendlog_event);
+  }
+  m_appendlog_event->wake();
+}
+
+void RaftNode::stopAppendLogHeart() {
+  m_appendlog_event->cancle();
+  // m_appendlog_event->cancleRepeated();
+  // m_appendlog_event.reset();
+}
+
+void RaftNode::election() {
+
+  m_coroutine_mutex.lock();
+  m_state = RAFT_CANDIDATE_STATE;
+  // first add current term
+  m_current_term++;
+  // give vote to self
+  m_voted_for_id = m_node_id;
+
+  RaftNode* tmp = this;
+  m_coroutine_mutex.unlock();
+  int old_term = tmp->m_current_term;
+
+  std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>> rpc_list;
+  for (int i = 1; i <= m_node_count; ++i) {
+    if ((int)i == m_node_id) {
+      continue;
     }
-  };
+    std::shared_ptr<AskVoteRequest> request = std::make_shared<AskVoteRequest>();
+    std::shared_ptr<AskVoteResponse> response = std::make_shared<AskVoteResponse>();
 
-  tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToEachThread(cb);
+    request->set_candidate_id(tmp->m_node_id);
+    request->set_candidate_term(tmp->m_current_term);
+    request->set_last_log_index(tmp->m_logs.size() - 1);
+    request->set_last_log_term(tmp->m_logs[tmp->m_logs.size() - 1].term());
+    request->set_node_id(tmp->m_node_id);
+    request->set_node_addr(tmp->m_node_addr);
+    request->set_node_name(tmp->m_node_name);
+    request->set_peer_node_id(i);
 
-  tinyrpc::TimerEvent::ptr event = 
-    std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, false, cb);
-  tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(event);
+    rpc_list.emplace_back(std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>(request, response));
+  }
 
+  AskVoteRPCs(rpc_list);
+  m_coroutine_mutex.lock();
+  // when call askVoteRPCs, receive leader's appendLogEntries, then become to follower
+  if (m_state == RAFT_FOLLOWER_STATE) {
+    // give up current election
+    m_coroutine_mutex.unlock();
+    return;
+  }
+
+  int succ_count = 1;
+  bool elect_succ = false;
+  for (auto i : rpc_list) {
+    if (i.second->accept_result() == ACCEPT_SUCC) {
+      succ_count++;
+      AppInfoLog << formatString("[%s name: %s, term: %d, state: %s] succ get vote from node[%s name: %s, term: %d, state: %s]",
+        m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
+        i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()).c_str());
+
+      if (succ_count >= getMostNodeCount()) {
+        elect_succ = true;
+        break;
+      }
+    } else {
+      if (i.second->accept_result() == ACCEPT_FAIL) {
+        AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] failed get vote from node[%s name: %s, term: %s, state: %s], faild reason[%d, %s]",
+          m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
+          i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()).c_str(),
+          i.second->vote_fail_code(), i.second->vote_fail_reason().c_str());
+
+        if (i.second->vote_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < i.second->term()) {
+          // TODO: become to follewer
+          toFollower(i.second->term());
+          return;
+        }
+      
+      }
+    }
+  }
+
+  if (!elect_succ) {
+    // TODO:
+    AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] failed get most node vote",
+      m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str());
+    return;
+  }
+  m_coroutine_mutex.lock();
+  m_state = RAFT_LEADER_STATE;
+  AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] succ get most node vote, elected to leader node",
+    m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str());
+  m_coroutine_mutex.unlock();
+
+  startAppendLogHeart();
 }
 
 

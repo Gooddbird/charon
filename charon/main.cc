@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
   REGISTER_SERVICE(charon::Raft);
 
   auto cb = []() {
-    charon::RaftNodeContainer::GetRaftNodeContainer()->getRaftNode(0)->init();
+    charon::RaftNodeContainer::GetRaftNodeContainer()->getRaftNode(0)->resetElectionTimer();
   };
   tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToEachThread(cb);
 
