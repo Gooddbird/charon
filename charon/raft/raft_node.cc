@@ -11,6 +11,7 @@
 #include "tinyrpc/net/tcp/io_thread.h"
 #include "tinyrpc/net/mutex.h"
 #include "tinyrpc/net/timer.h"
+#include "tinyrpc/coroutine/coroutine_pool.h"
 
 #include "charon/raft/raft_node.h"
 #include "charon/pb/raft.pb.h"
@@ -126,7 +127,7 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
   }
 
   if (request.candidate_term() > m_current_term) {
-    AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AskVote request, now to incrase term, change to [term: %d, state: %s]",
+    AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AskVote request, now to incrase term, change to [term: %d, state: %s]",
       m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str(),
       request.candidate_term(), StateToString(RAFT_FOLLOWER_STATE).c_str());
 
@@ -135,7 +136,7 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
   }
 
   bool is_vote = false;
-  if (m_voted_for_id == 0 || m_voted_for_id == request.candidate_id()) {
+  if (m_voted_for_id == 0) {
     LogEntry last_log = m_logs[m_logs.size() - 1];
     if (request.last_log_term() > last_log.term()) {
       is_vote = true;
@@ -148,15 +149,28 @@ void RaftNode::handleAskVote(const AskVoteRequest& request, AskVoteResponse& res
       is_vote = true;
 
     } else {
-      // exception case
       response.set_accept_result(ACCEPT_FAIL);
       response.set_vote_fail_code(ERR_LOG_MORE_THAN_CANDIDATE);
-      response.set_vote_fail_reason(formatString("current log[term: %d, index: %d] is new than yours log[term: %d, index: %d]", 
-        last_log.term(), last_log.index(), request.last_log_term(), request.last_log_index()));
+      std::string reason = formatString("current log[term: %d, index: %d] is new than yours log[term: %d, index: %d]", 
+        last_log.term(), last_log.index(), request.last_log_term(), request.last_log_index());
+      AppInfoLog << reason;
+      response.set_vote_fail_reason(reason);
 
       return;
     }
 
+  } else if (m_voted_for_id == request.candidate_id()) {
+    is_vote = true;
+  } else if (m_voted_for_id == m_node_id) {
+    std::string reason = formatString("[Term: %d, state: %s, addr: %s, name: %s] has already vote to self",
+      m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str());
+
+    AppInfoLog << reason;
+    response.set_accept_result(ACCEPT_FAIL);
+    response.set_vote_fail_code(ERR_LOG_MORE_THAN_CANDIDATE);
+    response.set_vote_fail_reason(reason);
+  } else {
+    // exception case
   }
   if (is_vote) {
     m_voted_for_id = request.node_id();
@@ -320,7 +334,10 @@ int RaftNode::appendLogEntries() {
 
   std::vector<int> tmp(m_match_indexs.begin() + 1, m_match_indexs.end());
   std::sort(tmp.begin(), tmp.end());
-  
+  int t = tmp[getMostNodeCount() - 1];
+  if (t > m_commit_index) {
+    m_commit_index = t;
+  }
 
   if (succ_count >= getMostNodeCount()) {
     AppInfoLog << "appendLogEntries succ";
@@ -332,8 +349,8 @@ int RaftNode::appendLogEntries() {
 
 void RaftNode::toFollower(int term) {
   m_coroutine_mutex.lock();
-  AppErrorLog << formatString("[Term: %d][%s - %d - %s] raft node become to follewer [Term: %d, state: %s]",
-    m_current_term, m_node_addr.c_str(), m_node_id, m_node_name.c_str(), m_current_term, StateToString(RAFT_FOLLOWER_STATE).c_str());
+  AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] raft node become to follewer [Term: %d, state: %s]",
+    m_current_term, m_node_addr.c_str(), m_node_id, m_node_name.c_str(), term, StateToString(RAFT_FOLLOWER_STATE).c_str());
   m_state = RAFT_FOLLOWER_STATE;
   m_current_term = term;
   m_voted_for_id = 0;
@@ -373,12 +390,12 @@ void RaftNode::setState(RaftNodeState state) {
 
 void RaftNode::resetElectionTimer() {
   if (!m_election_event) {
-    tinyrpc::Coroutine::ptr cor = tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToRandomThread(
-        [this]() {
+    tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
+    cor->setCallBack(
+      [this]() {
           election();
-        }
+      }
     );
-
     m_election_event = 
       std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, false, [cor]() mutable {
         auto t = cor.get();
@@ -396,10 +413,11 @@ void RaftNode::resetElectionTimer() {
 
 void RaftNode::startAppendLogHeart() {
   if (!m_appendlog_event) {
-    tinyrpc::Coroutine::ptr cor = tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToRandomThread(
-        [this]() {
-          appendLogEntries();
-        }
+    tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
+    cor->setCallBack(
+      [this]() {
+        appendLogEntries();
+      }
     );
 
     m_appendlog_event = 
@@ -415,9 +433,9 @@ void RaftNode::startAppendLogHeart() {
 }
 
 void RaftNode::stopAppendLogHeart() {
-  m_appendlog_event->cancle();
-  // m_appendlog_event->cancleRepeated();
-  // m_appendlog_event.reset();
+  if (m_appendlog_event) {
+    m_appendlog_event->cancle();
+  }
 }
 
 void RaftNode::election() {
@@ -431,7 +449,6 @@ void RaftNode::election() {
 
   RaftNode* tmp = this;
   m_coroutine_mutex.unlock();
-  int old_term = tmp->m_current_term;
 
   std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>> rpc_list;
   for (int i = 1; i <= m_node_count; ++i) {
