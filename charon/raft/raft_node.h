@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <map>
-#include "charon/pb/raft.pb.h"
+#include "charon/pb/charon.pb.h"
 #include "tinyrpc/net/mutex.h"
 #include "tinyrpc/net/timer.h"
 
@@ -59,9 +59,9 @@ class RaftNode {
 
   void election();
 
-  void AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list);
+  int AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list);
 
-  void AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list);
+  int AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list);
 
   RaftNodeState getState();
 
@@ -78,6 +78,10 @@ class RaftNode {
   
   // get more than half nodes count
   int getMostNodeCount();
+
+  void lock();
+
+  void unlock();
 
 
  // common state of all node

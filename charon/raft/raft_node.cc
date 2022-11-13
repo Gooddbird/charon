@@ -14,7 +14,7 @@
 #include "tinyrpc/coroutine/coroutine_pool.h"
 
 #include "charon/raft/raft_node.h"
-#include "charon/pb/raft.pb.h"
+#include "charon/pb/charon.pb.h"
 #include "charon/comm/util.h"
 
 
@@ -297,54 +297,24 @@ int RaftNode::appendLogEntries() {
     rpc_list.emplace_back(std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>(request, response));
   }
 
-  AppendLogEntriesRPCs(rpc_list);
-  int succ_count = 1;
+  int rt = AppendLogEntriesRPCs(rpc_list);
 
-  for (auto i : rpc_list) {
-    int match_index = i.first->last_log_index();
-    if (i.second->accept_result() == ACCEPT_SUCC) {
-      succ_count++;
-      updateMatchIndex(i.first->node_id(), match_index);
-      updateNextIndex(i.first->node_id(), match_index + 1);
-      AppInfoLog << formatString("[%s name: %s, term: %d, state: %s] succ apply log[%s] to node[%s name: %s, term: %s, state: %s]",
-        m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state),
-        LogEntryToString(m_logs[match_index]).c_str(), 
-        i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()));
-    } else {
-
-      if (i.second->accept_result() == ACCEPT_FAIL) {
-        AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] failed apply log[%s] to node[%s name: %s, term: %s, state: %s], faild reason[%d, %s]",
-          m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state),
-          LogEntryToString(m_logs[match_index]).c_str(), 
-          i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()).c_str(),
-          i.second->append_fail_code(), i.second->append_fail_reason().c_str());
-
-        if (i.second->append_fail_code() == ERR_NOT_MATCH_PREINDEX) {
-          updateNextIndex(i.first->node_id(), i.second->need_index());
-        } else if (i.second->append_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < i.second->term()) {
-          // TODO: become to follewer
-          toFollower(i.second->term());
-          return -1;
-        }
-      }
-
-    }
-    
-  }
-
+  lock();
   std::vector<int> tmp(m_match_indexs.begin() + 1, m_match_indexs.end());
   std::sort(tmp.begin(), tmp.end());
   int t = tmp[getMostNodeCount() - 1];
   if (t > m_commit_index) {
     m_commit_index = t;
   }
+  unlock();
 
-  if (succ_count >= getMostNodeCount()) {
-    AppInfoLog << "appendLogEntries succ";
-    return 0;
+  if (rt != 0) {
+    AppInfoLog << "appendLogEntries failed";
+    return -1;
   }
 
-  return -1;
+  AppInfoLog << "appendLogEntries succ";
+  return 0;
 }
 
 void RaftNode::toFollower(int term) {
@@ -361,12 +331,147 @@ void RaftNode::toFollower(int term) {
   resetElectionTimer();
 }
 
-void RaftNode::AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list) {
-  CALL_RAFT_RPCS(AskVoteRequest, AskVoteResponse, AskVote);
+int RaftNode::AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>>& rpc_list) {
+  tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();
+  std::atomic_int res_nodes {1};
+  std::atomic_int succ_count {1};
+  std::atomic_bool need_resume {true};
+
+  if ((int)(rpc_list.size()) + 1 != m_node_count) {
+    AppErrorLog << "AskVoteRPCs Error, rpc_list size is not all nodes count - 1";
+    // return;
+  }
+  for (size_t i = 0; i < rpc_list.size(); ++i) {
+    std::shared_ptr<AskVoteRequest> request = rpc_list[i].first;
+    std::shared_ptr<AskVoteResponse> response = rpc_list[i].second;
+    int id = request->peer_node_id();
+    printf("id=%d, addr is %s \n", id, m_nodes[id]["addr"].c_str());
+    tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(m_nodes[id]["addr"]);
+    tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel =
+      std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);
+    tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
+    tinyrpc::TinyPbRpcClosure::ptr closure = std::make_shared<tinyrpc::TinyPbRpcClosure>(
+      [&res_nodes, cur_cor, &need_resume, this, request, response, &succ_count]() mutable {
+        res_nodes++;
+
+        this->lock();
+        if (this->getState() == RAFT_FOLLOWER_STATE) {
+          // give up current election
+          // donothing
+          this->unlock();
+          return;
+        }
+        if (response->accept_result() == ACCEPT_SUCC) {
+          succ_count++;
+          AppInfoLog << formatString("AskVoteRPCs [%s name: %s, term: %d, state: %s] succ get vote from node[%s name: %s, term: %d, state: %s]",
+            m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(), response->node_addr().c_str(), 
+            response->node_name().c_str(), response->term(), StateToString(response->state()).c_str());
+
+        } else {
+          AppErrorLog << formatString("AskVoteRPCs [%s name: %s, term: %d, state: %s] failed get vote from node[%s name: %s, term: %s, state: %s], faild reason[%d, %s]",
+            m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
+            response->node_addr().c_str(), response->node_name().c_str(), response->term(), StateToString(response->state()).c_str(),
+            response->vote_fail_code(), response->vote_fail_reason().c_str());
+
+          if (response->vote_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < response->term()) {
+            // TODO: become to follewer
+            toFollower(response->term());
+            return;
+          }
+          
+        }
+        this->unlock();
+        if (succ_count >= this->getMostNodeCount() && need_resume.exchange(false)) {
+            tinyrpc::Coroutine::Resume(cur_cor);
+          }
+        }
+    );
+    rpc_controller->SetTimeout(2000);
+    rpc_channel->saveCallee(rpc_controller, request, response, closure);
+    CharonService_Stub stub(rpc_channel.get());
+    AppInfoLog << "AskVote request to raft node["<< m_nodes[id]["addr"] << ", " << m_nodes[id]["name"] << "]";
+    stub.AskVote(rpc_controller.get(), request.get(), response.get(), closure.get());
+  }
+  tinyrpc::Coroutine::Yield();
+  if (succ_count >= this->getMostNodeCount()) {
+    return 0;
+  }
+  return -1;
 }
 
-void RaftNode::AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list) {
-  CALL_RAFT_RPCS(AppendLogEntriesRequest, AppendLogEntriesResponse, AppendLogEntries);
+int RaftNode::AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list) {
+  tinyrpc::Coroutine* cur_cor = tinyrpc::Coroutine::GetCurrentCoroutine();
+
+  std::atomic_int res_nodes {1};
+  std::atomic_int succ_count {1};
+  std::atomic_bool need_resume {true};
+
+  if ((int)(rpc_list.size()) + 1 != m_node_count) {
+    AppErrorLog << "AppendLogEntries Error, rpc_list size is not all nodes count - 1";
+    // return -1;
+  }
+  for (size_t i = 0; i < rpc_list.size(); ++i) {
+    std::shared_ptr<AppendLogEntriesRequest> request = rpc_list[i].first;
+    std::shared_ptr<AppendLogEntriesResponse> response = rpc_list[i].second;
+    int id = request->peer_node_id();
+    printf("id=%d, addr is %s \n", id, m_nodes[id]["addr"].c_str());
+    tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(m_nodes[id]["addr"]);
+    tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel =
+      std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);
+    tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
+    tinyrpc::TinyPbRpcClosure::ptr closure = std::make_shared<tinyrpc::TinyPbRpcClosure>(
+      [&res_nodes, cur_cor, &need_resume, this, request, response, &succ_count]() mutable {
+        res_nodes++;
+
+        this->lock();
+        if (this->getState() == RAFT_FOLLOWER_STATE) {
+          // give up current election
+          // donothing
+          this->unlock();
+          return;
+        }
+        int match_index = request->last_log_index();
+        if (response->accept_result() == ACCEPT_SUCC) {
+          succ_count++;
+          AppInfoLog << formatString("AppendLogEntries [%s name: %s, term: %d, state: %s] succ apply log to node[%s name: %s, term: %d, state: %s]",
+            m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(), response->node_addr().c_str(), 
+            response->node_name().c_str(), response->term(), StateToString(response->state()).c_str());
+
+          updateMatchIndex(request->node_id(), match_index);
+          updateNextIndex(request->node_id(), match_index + 1);
+
+        } else {
+          AppErrorLog << formatString("AppendLogEntries [%s name: %s, term: %d, state: %s] failed get apply log to node[%s name: %s, term: %s, state: %s], faild reason[%d, %s]",
+            m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
+            response->node_addr().c_str(), response->node_name().c_str(), response->term(), StateToString(response->state()).c_str(),
+            response->append_fail_code(), response->append_fail_reason().c_str());
+
+          if (response->append_fail_code() == ERR_NOT_MATCH_PREINDEX) {
+            updateNextIndex(request->node_id(), response->need_index());
+          } else if (response->append_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < response->term()) {
+            toFollower(response->term());
+            return;
+          }
+        }
+
+        this->unlock();
+        if (succ_count >= this->getMostNodeCount() && need_resume.exchange(false)) {
+            tinyrpc::Coroutine::Resume(cur_cor);
+          }
+        }
+    );
+    rpc_controller->SetTimeout(2000);
+    rpc_channel->saveCallee(rpc_controller, request, response, closure);
+    CharonService_Stub stub(rpc_channel.get());
+    AppInfoLog << "AppendLogEntries request to raft node["<< m_nodes[id]["addr"] << ", " << m_nodes[id]["name"] << "]";
+    stub.AppendLogEntries(rpc_controller.get(), request.get(), response.get(), closure.get());
+  }
+  tinyrpc::Coroutine::Yield();
+  if (succ_count >= this->getMostNodeCount()) {
+    return 0;
+  }
+  return -1;
+
 }
 
 int RaftNode::getNodeCount() {
@@ -469,52 +574,15 @@ void RaftNode::election() {
 
     rpc_list.emplace_back(std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>(request, response));
   }
+  int rt = AskVoteRPCs(rpc_list);
 
-  AskVoteRPCs(rpc_list);
-  m_coroutine_mutex.lock();
-  // when call askVoteRPCs, receive leader's appendLogEntries, then become to follower
-  if (m_state == RAFT_FOLLOWER_STATE) {
-    // give up current election
-    m_coroutine_mutex.unlock();
-    return;
-  }
-
-  int succ_count = 1;
-  bool elect_succ = false;
-  for (auto i : rpc_list) {
-    if (i.second->accept_result() == ACCEPT_SUCC) {
-      succ_count++;
-      AppInfoLog << formatString("[%s name: %s, term: %d, state: %s] succ get vote from node[%s name: %s, term: %d, state: %s]",
-        m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
-        i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()).c_str());
-
-      if (succ_count >= getMostNodeCount()) {
-        elect_succ = true;
-        break;
-      }
-    } else {
-      if (i.second->accept_result() == ACCEPT_FAIL) {
-        AppErrorLog << formatString("[%s name: %s, term: %d, state: %s] failed get vote from node[%s name: %s, term: %s, state: %s], faild reason[%d, %s]",
-          m_node_addr.c_str(), m_node_name.c_str(), m_current_term, StateToString(m_state).c_str(),
-          i.second->node_addr().c_str(), i.second->node_name().c_str(), i.second->term(), StateToString(i.second->state()).c_str(),
-          i.second->vote_fail_code(), i.second->vote_fail_reason().c_str());
-
-        if (i.second->vote_fail_code() == ERR_TERM_MORE_THAN_LEADER && m_current_term < i.second->term()) {
-          // TODO: become to follewer
-          toFollower(i.second->term());
-          return;
-        }
-      
-      }
-    }
-  }
-
-  if (!elect_succ) {
+  if (rt != 0) {
     // TODO:
     AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] failed get most node vote",
       m_current_term, StateToString(m_state).c_str(), m_node_addr.c_str(), m_node_name.c_str());
     return;
   }
+
   m_coroutine_mutex.lock();
   m_state = RAFT_LEADER_STATE;
   AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] succ get most node vote, elected to leader node",
@@ -561,6 +629,16 @@ void RaftNode::updateMatchIndex(const int& node_id, const int& v) {
     m_match_indexs[node_id] = v;
   }
 }
+
+void RaftNode::lock() {
+  m_coroutine_mutex.lock();
+}
+
+void RaftNode::unlock() {
+  m_coroutine_mutex.unlock();
+} 
+
+
 
 std::string StateToString(const RaftNodeState& state) {
   if (state == RAFT_LEADER_STATE) {
