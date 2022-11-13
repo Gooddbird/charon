@@ -1,12 +1,14 @@
 #ifndef CHARON_COMM_UTIL_H
 #define CHARON_COMM_UTIL_H
 
+#include <map>
 
 namespace charon {
 
 // template<typename... Args>
 // std::string formatString(const char* str, Args&&... args);
 
+typedef std::map<std::string, std::string> KVMap;
 
 template<typename... Args>
 std::string formatString(const char* str, Args&&... args) {

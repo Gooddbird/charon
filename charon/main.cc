@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
   REGISTER_SERVICE(charon::CharonServiceImpl);
 
   auto cb = []() {
-    charon::RaftNodeContainer::GetRaftNodeContainer()->getRaftNode(0)->resetElectionTimer();
+    charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
   };
   tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToEachThread(cb);
 

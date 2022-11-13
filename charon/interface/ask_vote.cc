@@ -37,7 +37,7 @@ void AskVoteInterface::run() {
   // m_reponse.set_res_info("Succ");
   //
   
-  RaftNodeContainer::GetRaftNodeContainer()->getRaftNode(0)->handleAskVote(m_request, m_response);
+  RaftNode::GetRaftNode()->getRaftPartition(0)->handleAskVote(m_request, m_response);
 
 }
 
