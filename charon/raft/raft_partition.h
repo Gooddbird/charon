@@ -61,9 +61,9 @@ class RaftPartition {
 
   int AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>>& rpc_list);
 
-  RaftState getState();
+  RAFT_STATE getState();
 
-  void setState(RaftState state);
+  void setState(RAFT_STATE state);
 
   void updateNextIndex(const int& node_id, const int& v);
 
@@ -102,7 +102,7 @@ class RaftPartition {
   std::vector<int> m_match_indexs;
 
  private:
-  RaftState m_state;
+  RAFT_STATE m_state;
 
   int m_id {0};
   std::string m_name;

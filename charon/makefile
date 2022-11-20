@@ -27,6 +27,7 @@ PATH_PB = pb
 PATH_COMM = comm
 PATH_OBJ = ../obj
 PATH_TEST_CLIENT = ../test_client
+PATH_TEST_CLIENT_TOOL = $(PATH_TEST_CLIENT)/test_tool
 PATH_RAFT = raft
 PATH_DATA = data
 
@@ -63,14 +64,14 @@ COMM_OBJS := $(patsubst $(PATH_COMM)/%.cc, $(PATH_OBJ)/%.o, $(wildcard $(PATH_CO
 RAFT_OBJS := $(patsubst $(PATH_RAFT)/%.cc, $(PATH_OBJ)/%.o, $(wildcard $(PATH_RAFT)/*.cc))
 DATA_OBJS := $(patsubst $(PATH_DATA)/%.cc, $(PATH_OBJ)/%.o, $(wildcard $(PATH_DATA)/*.cc))
 
-TEST_BINS := $(patsubst $(PATH_TEST_CLIENT)/%.cc, $(PATH_TEST_CLIENT)/%, $(wildcard $(PATH_TEST_CLIENT)/*.cc))
+TEST_BINS := $(patsubst $(PATH_TEST_CLIENT)/%.cc, $(PATH_TEST_CLIENT_TOOL)/%, $(wildcard $(PATH_TEST_CLIENT)/*.cc))
 
 OUT : $(TARGET) $(TEST_BINS)
 
 $(TARGET) : $(PB_OBJS) $(SERVICE_OBJS) $(INTERFACE_OBJS) $(RAFT_OBJS) $(DATA_OBJS)
 	$(CXX) $(CXX_FLAGS) main.cc -o $@ $^ $(LIBS) -ldl -lpthread
 
-$(PATH_TEST_CLIENT)/%: $(PATH_TEST_CLIENT)/%.cc $(PB_OBJS)
+$(PATH_TEST_CLIENT_TOOL)/%: $(PATH_TEST_CLIENT)/%.cc $(PB_OBJS)
 	$(CXX) $(CXX_FLAGS) $< -o $@ $(LIBS) $(PB_OBJS) -ldl -lpthread
 
 $(PATH_OBJ)/%.o : $(PATH_PB)/%.cc

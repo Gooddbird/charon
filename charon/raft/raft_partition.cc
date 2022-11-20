@@ -33,7 +33,7 @@ RaftPartition::RaftPartition() {
 
   m_current_term = 0;
   m_voted_for_id = 0;
-  m_state = RAFT_FOLLOWER_STATE;
+  m_state = EN_RAFT_STATE_FOLLOWER;
   std::string local_addr = tinyrpc::GetServer()->getLocalAddr()->toString();
 
   TiXmlElement* node =  tinyrpc::GetConfig()->getXmlNode("raft");
@@ -63,6 +63,7 @@ RaftPartition::RaftPartition() {
   //   id++;
   //   m_node_count++;
   // }
+
   TiXmlElement* conf_node = node->FirstChildElement("raft_conf");
   assert(conf_node);
   m_elect_overtime = std::atoi(conf_node->FirstChildElement("elect_timeout")->GetText());
@@ -76,7 +77,7 @@ RaftPartition::~RaftPartition() {
 
 void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse& response) {
   response.set_term(m_current_term);
-  response.set_accept_result(ACCEPT_FAIL);
+  response.set_accept_result(EN_ACCEPT_FAIL);
   response.set_vote_fail_code(0);
   response.set_id(m_id);
   response.set_name(m_name);
@@ -84,7 +85,7 @@ void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse
   response.set_state(m_state);
 
   if (request.term() < m_current_term) {
-    response.set_accept_result(ACCEPT_FAIL);
+    response.set_accept_result(EN_ACCEPT_FAIL);
     response.set_vote_fail_reason(formatString("AskVote failed, your's term[%d] is less than my term[%d]", 
       request.term(), m_current_term));
     response.set_vote_fail_code(ERR_TERM_MORE_THAN_CANDICATE);
@@ -94,7 +95,7 @@ void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse
   if (request.term() > m_current_term) {
     AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AskVote request, now to incrase term, change to [term: %d, state: %s]",
       m_current_term, RaftNode::StateToString(m_state).c_str(), m_addr.c_str(), m_name.c_str(),
-      request.term(), RaftNode::StateToString(RAFT_FOLLOWER_STATE).c_str());
+      request.term(), RaftNode::StateToString(EN_RAFT_STATE_FOLLOWER).c_str());
 
     toFollower(request.term());
     resetElectionTimer();
@@ -114,7 +115,7 @@ void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse
       is_vote = true;
 
     } else {
-      response.set_accept_result(ACCEPT_FAIL);
+      response.set_accept_result(EN_ACCEPT_FAIL);
       response.set_vote_fail_code(ERR_LOG_MORE_THAN_CANDIDATE);
       std::string reason = formatString("current log[term: %d, index: %d] is new than yours log[term: %d, index: %d]", 
         last_log.term(), last_log.index(), request.last_log_term(), request.last_log_index());
@@ -131,7 +132,7 @@ void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse
       m_current_term, RaftNode::StateToString(m_state).c_str(), m_addr.c_str(), m_name.c_str());
 
     AppInfoLog << reason;
-    response.set_accept_result(ACCEPT_FAIL);
+    response.set_accept_result(EN_ACCEPT_FAIL);
     response.set_vote_fail_code(ERR_LOG_MORE_THAN_CANDIDATE);
     response.set_vote_fail_reason(reason);
   } else {
@@ -139,15 +140,15 @@ void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse
   }
   if (is_vote) {
     m_voted_for_id = request.id();
-    response.set_accept_result(ACCEPT_SUCC);
-    m_state = RAFT_CANDIDATE_STATE;
+    response.set_accept_result(EN_ACCEPT_SUCC);
+    m_state = EN_RAFT_STATE_CANDIDATE;
     resetElectionTimer();
   }
 }
 
 void RaftPartition::handleAppendLogEntries(const AppendLogEntriesRequest& request, AppendLogEntriesResponse& response) {
   response.set_term(m_current_term);
-  response.set_accept_result(ACCEPT_FAIL);
+  response.set_accept_result(EN_ACCEPT_FAIL);
   response.set_term(m_current_term);
   response.set_append_fail_code(0);
   response.set_id(m_id);
@@ -157,7 +158,7 @@ void RaftPartition::handleAppendLogEntries(const AppendLogEntriesRequest& reques
 
   if (request.leader_term() < m_current_term) {
     // return false when leader's term less than current Node's term
-    response.set_accept_result(ACCEPT_FAIL);
+    response.set_accept_result(EN_ACCEPT_FAIL);
     response.set_append_fail_code(ERR_TERM_MORE_THAN_LEADER);
     response.set_append_fail_reason(formatString("AppendLogEntries failed, leader's term[%d] is less than current term[%d]",
       request.leader_term(), m_current_term));
@@ -168,7 +169,7 @@ void RaftPartition::handleAppendLogEntries(const AppendLogEntriesRequest& reques
   if (request.leader_term() > m_current_term) {
     AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] receive high term AppendLogEntriesRequest request, now to incrase term, change to [term: %d, state: %s]",
       m_current_term, RaftNode::StateToString(m_state).c_str(), m_addr.c_str(), m_name.c_str(),
-      request.leader_term(), RaftNode::StateToString(RAFT_FOLLOWER_STATE).c_str());
+      request.leader_term(), RaftNode::StateToString(EN_RAFT_STATE_FOLLOWER).c_str());
 
     toFollower(request.leader_term());
   }
@@ -180,7 +181,7 @@ void RaftPartition::handleAppendLogEntries(const AppendLogEntriesRequest& reques
       || (m_logs[prev_log_index].index() != request.prev_log_index())) {
 
     // return false when Node can't find log match(prev_log_index, prev_log_term) 
-    response.set_accept_result(ACCEPT_FAIL);
+    response.set_accept_result(EN_ACCEPT_FAIL);
     response.set_append_fail_code(ERR_NOT_MATCH_PREINDEX);
     response.set_append_fail_reason(
       formatString("AppendLogEntries failed, Node can't match prev_log_index[%d], prev_log_term[%d]",
@@ -202,7 +203,7 @@ void RaftPartition::handleAppendLogEntries(const AppendLogEntriesRequest& reques
     m_commit_index = std::min(request.leader_commit_index(), m_logs[m_logs.size() - 1].index());
   }
 
-  response.set_accept_result(ACCEPT_SUCC);
+  response.set_accept_result(EN_ACCEPT_SUCC);
 
 }
 
@@ -212,7 +213,7 @@ int RaftPartition::applyToStateMachine(const LogEntry& logs) {
 }
 
 int RaftPartition::appendLogEntries() {
-  if (m_state != RAFT_LEADER_STATE) {
+  if (m_state != EN_RAFT_STATE_LEADER) {
     AppErrorLog << formatString("[Term: %d][%s - %d - %s] current raft node state isn't LEADER, can't appendLogEntries",
       m_current_term, m_addr.c_str(), m_id, m_name.c_str());
     return -1;
@@ -285,8 +286,8 @@ int RaftPartition::appendLogEntries() {
 void RaftPartition::toFollower(int term) {
   m_coroutine_mutex.lock();
   AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] raft node become to follewer [Term: %d, state: %s]",
-    m_current_term, m_addr.c_str(), m_id, m_name.c_str(), term, RaftNode::StateToString(RAFT_FOLLOWER_STATE).c_str());
-  m_state = RAFT_FOLLOWER_STATE;
+    m_current_term, m_addr.c_str(), m_id, m_name.c_str(), term, RaftNode::StateToString(EN_RAFT_STATE_FOLLOWER).c_str());
+  m_state = EN_RAFT_STATE_FOLLOWER;
   m_current_term = term;
   m_voted_for_id = 0;
 
@@ -322,13 +323,13 @@ int RaftPartition::AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequ
         res_nodes++;
 
         this->lock();
-        if (this->getState() == RAFT_FOLLOWER_STATE) {
+        if (this->getState() == EN_RAFT_STATE_FOLLOWER) {
           // give up current election
           // donothing
           this->unlock();
           return;
         }
-        if (response->accept_result() == ACCEPT_SUCC) {
+        if (response->accept_result() == EN_ACCEPT_SUCC) {
           succ_count++;
           AppInfoLog << formatString("AskVoteRPCs [%s name: %s, term: %d, state: %s] succ get vote from node[%s name: %s, term: %d, state: %s]",
             m_addr.c_str(), m_name.c_str(), m_current_term, RaftNode::StateToString(m_state).c_str(), response->addr().c_str(), 
@@ -392,14 +393,14 @@ int RaftPartition::AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<Ap
         res_nodes++;
 
         this->lock();
-        if (this->getState() == RAFT_FOLLOWER_STATE) {
+        if (this->getState() == EN_RAFT_STATE_FOLLOWER) {
           // give up current election
           // donothing
           this->unlock();
           return;
         }
         int match_index = request->last_log_index();
-        if (response->accept_result() == ACCEPT_SUCC) {
+        if (response->accept_result() == EN_ACCEPT_SUCC) {
           succ_count++;
           AppInfoLog << formatString("AppendLogEntries [%s name: %s, term: %d, state: %s] succ apply log to node[%s name: %s, term: %d, state: %s]",
             m_addr.c_str(), m_name.c_str(), m_current_term, RaftNode::StateToString(m_state).c_str(), response->addr().c_str(), 
@@ -443,11 +444,11 @@ int RaftPartition::AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<Ap
 }
 
 
-RaftState RaftPartition::getState() {
+RAFT_STATE RaftPartition::getState() {
   return m_state;
 }
 
-void RaftPartition::setState(RaftState state) {
+void RaftPartition::setState(RAFT_STATE state) {
   m_state = state;
 }
 
@@ -505,7 +506,7 @@ void RaftPartition::stopAppendLogHeart() {
 void RaftPartition::election() {
 
   m_coroutine_mutex.lock();
-  m_state = RAFT_CANDIDATE_STATE;
+  m_state = EN_RAFT_STATE_CANDIDATE;
   // first add current term
   m_current_term++;
   // give vote to self
@@ -543,7 +544,7 @@ void RaftPartition::election() {
   }
 
   m_coroutine_mutex.lock();
-  m_state = RAFT_LEADER_STATE;
+  m_state = EN_RAFT_STATE_LEADER;
   AppInfoLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] succ get most node vote, elected to leader node",
     m_current_term, RaftNode::StateToString(m_state).c_str(), m_addr.c_str(), m_name.c_str());
   m_coroutine_mutex.unlock();
@@ -554,7 +555,7 @@ void RaftPartition::election() {
 
 int RaftPartition::execute(const std::string& cmd) {
   m_coroutine_mutex.lock();
-  if (m_state != RAFT_LEADER_STATE) {
+  if (m_state != EN_RAFT_STATE_LEADER) {
     // redirect to leader
   }
   LogEntry log;

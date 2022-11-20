@@ -1,6 +1,39 @@
 syntax = "proto3";
 option cc_generic_services = true;
 
+
+enum REQUEST_ORIGIN {
+  EN_REQUEST_UNDEFINE = 0;
+  EN_REQUEST_FORM_CLIENT = 1;
+  EN_REQUEST_FORM_RAFTNODE = 2;
+};
+
+enum RAFT_STATE {
+  EN_RAFT_STATE_UNDEFINE = 0;
+  EN_RAFT_STATE_FOLLOWER = 1;
+  EN_RAFT_STATE_CANDIDATE = 2;
+  EN_RAFT_STATE_LEADER = 3;
+};
+
+enum ACCEPT_RESULT {
+  EN_ACCEPT_UNDEFINE = 0;
+  EN_ACCEPT_SUCC = 1;
+  EN_ACCEPT_FAIL = 2;
+};
+
+enum RAFT_SERVER_LSTATE {
+  EN_RAFT_LSTATE_UNDEFINE = 0;
+  EN_RAFT_LSTATE_ACTIVE = 1;
+  EN_RAFT_LSTATE_DELETED = 2;
+
+}
+
+message LogEntry {
+  int32 index = 1;
+  int32 term = 2;
+  string cmd = 3;
+};
+
 message DiscoverTag {
   string tag1 = 1;
   string tag2 = 2;
@@ -34,25 +67,6 @@ message RegisterResponse {
   string res_info = 2;
 };
 
-enum AcceptResult {
-  ACCEPT_UNKNOWN = 0;
-  ACCEPT_SUCC = 1;
-  ACCEPT_FAIL = 2;
-};
-
-
-enum RaftState {
-  RAFT_UNKNOWN_STATE = 0;
-  RAFT_FOLLOWER_STATE = 1;
-  RAFT_CANDIDATE_STATE = 2;
-  RAFT_LEADER_STATE = 3;
-};
-
-message LogEntry {
-  int32 index = 1;
-  int32 term = 2;
-  string cmd = 3;
-};
 
 message AskVoteRequest {
   // the candidate's term
@@ -83,7 +97,7 @@ message AskVoteResponse {
   int32 term = 3;
 
   // give a vote?
-  AcceptResult accept_result = 4;
+  ACCEPT_RESULT accept_result = 4;
   // why not vote
   string vote_fail_reason = 5;
 
@@ -95,7 +109,7 @@ message AskVoteResponse {
 
   string addr = 9;
 
-  RaftState state = 11;
+  RAFT_STATE state = 11;
 };
 
 message AppendLogEntriesRequest {
@@ -133,7 +147,7 @@ message AppendLogEntriesResponse {
   int32 term = 3;
 
   // append succ?
-  AcceptResult accept_result = 4;
+  ACCEPT_RESULT accept_result = 4;
   // reason of append log why failed
   string append_fail_reason = 5;
 
@@ -149,8 +163,64 @@ message AppendLogEntriesResponse {
   int32 need_index = 11;
   int32 need_term = 12;
 
-  RaftState state = 13;
+  RAFT_STATE state = 13;
 };
+
+
+message ServerNode {
+  int32 id = 1;
+  string addr = 2;
+  string name = 3;
+  RAFT_SERVER_LSTATE lstate = 4;
+};
+
+enum RAFT_SERVER_OPERATION {
+  EN_RAFT_SERVER_OPERATION_UNDEFINE = 0;
+  EN_RAFT_SERVER_OPERATION_ADD = 1;
+  EN_RAFT_SERVER_OPERATION_UPDATE = 2;
+  EN_RAFT_SERVER_OPERATION_DELETE = 3;
+  EN_RAFT_SERVER_OPERATION_QUERY = 4;
+};
+
+message OperateRaftServerNodeRequest {
+  RAFT_SERVER_OPERATION option = 1;
+  ServerNode node = 2;
+};
+
+message OperateRaftServerNodeResponse {
+
+  int32 ret_code = 1;
+  string res_info = 2;
+
+  RAFT_SERVER_OPERATION option = 3;
+  ServerNode node = 4;
+};
+
+message QueryAllRaftServerNodeRequest {
+  optional string client_ip = 1;
+};
+
+message QueryAllRaftServerNodeResponse {
+
+  int32 ret_code = 1;
+  string res_info = 2;
+
+  repeated ServerNode node_list = 4;
+};
+
+
+message RunCharonRequest {
+  REQUEST_ORIGIN origin = 1;
+  int32 delay = 2;
+  ServerNode server_nodes = 3;
+
+};
+
+message RunCharonResponse {
+  int32 ret_code = 1;
+  string res_info = 2;
+};
+
 
 
 service CharonService {
@@ -168,5 +238,12 @@ service CharonService {
 
   // only leader call, to append log to other followers 
   rpc AppendLogEntries(AppendLogEntriesRequest) returns (AppendLogEntriesResponse);
+
+  rpc OperateRaftServerNode(OperateRaftServerNodeRequest) returns (OperateRaftServerNodeResponse);
+
+  rpc QueryAllRaftServerNode(QueryAllRaftServerNodeRequest) returns (QueryAllRaftServerNodeResponse);
+
+  rpc RunCharon(RunCharonRequest) returns (RunCharonResponse);
+
 
 }

@@ -4,3 +4,4 @@ log/*
 *.pb.cc
 *.o
 *.a
+test_client/test_tool/*
