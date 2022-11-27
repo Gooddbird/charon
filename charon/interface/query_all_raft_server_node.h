@@ -34,6 +34,12 @@ class QueryAllRaftServerNodeInterface {
 
   void run();
 
+  void checkInputParam();
+
+  void setOutputParam();
+
+  void queryAllRaftServer();
+
  private:
   const ::QueryAllRaftServerNodeRequest& m_request;      // request object fron client
 

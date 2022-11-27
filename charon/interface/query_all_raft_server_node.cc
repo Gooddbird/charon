@@ -17,6 +17,8 @@
 #include "charon/interface/query_all_raft_server_node.h"
 #include "charon/pb/charon.pb.h"
 
+#include "charon/raft/raft_node.h"
+
 namespace charon {
 
 QueryAllRaftServerNodeInterface::QueryAllRaftServerNodeInterface(const ::QueryAllRaftServerNodeRequest& request, ::QueryAllRaftServerNodeResponse& response)
@@ -35,6 +37,28 @@ void QueryAllRaftServerNodeInterface::run() {
   // m_reponse.set_ret_code(0);
   // m_reponse.set_res_info("Succ");
   //
+
+  checkInputParam();
+
+  queryAllRaftServer();
+
+  setOutputParam();
+
+}
+
+void QueryAllRaftServerNodeInterface::checkInputParam() {
+
+}
+
+void QueryAllRaftServerNodeInterface::setOutputParam() {
+
+}
+
+void QueryAllRaftServerNodeInterface::queryAllRaftServer() {
+  std::vector<ServerNode> node_list;
+  RaftNode::GetRaftNode()->queryAllRaftServerNode(node_list);
+
+  *m_response.mutable_node_list() = {node_list.begin(), node_list.end()};
 
 }
 

@@ -14,8 +14,14 @@
 
 
 #include "tinyrpc/comm/log.h"
+#include "tinyrpc/net/tinypb/tinypb_rpc_async_channel.h"
+#include "tinyrpc/net/tinypb/tinypb_rpc_controller.h"
+#include "tinyrpc/net/tinypb/tinypb_rpc_closure.h"
 #include "charon/interface/run_charon.h"
 #include "charon/pb/charon.pb.h"
+#include "charon/comm/business_exception.h"
+#include "charon/comm/errcode.h"
+#include "charon/raft/raft_node.h"
 
 namespace charon {
 
@@ -36,12 +42,55 @@ void RunCharonInterface::run() {
   // m_reponse.set_res_info("Succ");
   //
 
+  checkInputParam();
+
+  handle();
+
 }
 
 
 void RunCharonInterface::checkInputParam() {
+  m_origin = m_request.origin();
+  if (m_origin == EN_REQUEST_UNDEFINE) {
+    throw BusinessException(ERR_PARAM_INPUT, "checkInputParam error, invalid request origin: " + std::to_string(m_origin), __FILE__, __LINE__); 
+  }
 
 }
 
+
+void RunCharonInterface::handle() {
+  if (m_origin == EN_REQUEST_FORM_CLIENT) {
+    handleRequestFromClient();
+  } else if (m_origin == EN_REQUEST_FORM_RAFTNODE) {
+    handleRequestFromRaftNode();
+  } else {
+    throw BusinessException(ERR_PARAM_INPUT, "checkInputParam error, invalid request origin: " + std::to_string(m_origin), __FILE__, __LINE__); 
+  }
+}
+
+void RunCharonInterface::handleRequestFromClient() {
+  std::vector<ServerNode> list;
+  RaftNode::GetRaftNode()->queryAllRaftServerNode(list);
+
+  if (list.empty()) {
+    throw BusinessException(ERR_EMPTY_RAFTNODES, "raft server node list is empty!", __FILE__, __LINE__); 
+  }
+
+  if (list.size() == 1) {
+    AppDebugLog << "Only set one raft node: ";
+  }
+
+
+  // std::shared_ptr<RunCharonRequest> req = std::make_shared<RunCharonRequest>();
+  // std::shared_ptr<RunCharonResponse> rsp = std::make_shared<RunCharonResponse>();
+  // tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(server_node["addr"]);
+
+  // tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel = std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);
+}
+
+void RunCharonInterface::handleRequestFromRaftNode() {
+
+
+}
 
 }

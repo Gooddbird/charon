@@ -37,6 +37,8 @@ class OperateRaftServerNodeInterface {
 
   void checkInputParam();
 
+  void setOutputParam();
+
   void dispatchOperator();
 
   void dealOperatorAdd();

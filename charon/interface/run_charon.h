@@ -36,6 +36,8 @@ class RunCharonInterface {
 
   void checkInputParam();
 
+  void handle();
+
   void handleRequestFromClient();
 
   void handleRequestFromRaftNode();
@@ -44,6 +46,8 @@ class RunCharonInterface {
   const ::RunCharonRequest& m_request;      // request object fron client
 
   ::RunCharonResponse& m_response;           // response object that reply to client
+
+  REQUEST_ORIGIN m_origin {EN_REQUEST_UNDEFINE};
 
 };
 

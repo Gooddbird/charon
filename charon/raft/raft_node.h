@@ -25,7 +25,7 @@ class RaftNode {
   // get more than half nodes count
   int getMostNodeCount();
 
-  const KVMap& getServerNode(int i);
+  const ServerNode& getServerNode(int i);
 
   void addRaftServerNode(ServerNode& node);
 
@@ -35,16 +35,20 @@ class RaftNode {
 
   void queryRaftServerNode(ServerNode& node);
 
+  void queryAllRaftServerNode(std::vector<ServerNode>& node_list);
+
 
  public:
+
+  static RaftNode* GetRaftNode();
 
   static std::string LogEntryToString(const LogEntry& log);
 
   static std::string StateToString(const RAFT_STATE& state);
 
-  static RAFT_SERVER_LSTATE StringToRaftLState(const std::string& state);
+  static std::string LStateToString(const RAFT_SERVER_LSTATE& state);
 
-  static RaftNode* GetRaftNode();
+  static std::string RaftServerNodeToString(const ServerNode& node);
 
 
  private:
@@ -58,7 +62,7 @@ class RaftNode {
   // key3: "id", value3: "xxx"
   // key4: "lstate", value4: 1-active, otherwise deleted
   // index 0 is undefine, so the first raft server node index is 1
-  std::vector<KVMap> m_server_nodes;
+  std::vector<ServerNode> m_server_nodes;
 
   int m_node_count {0};
 

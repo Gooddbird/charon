@@ -168,10 +168,11 @@ message AppendLogEntriesResponse {
 
 
 message ServerNode {
-  int32 id = 1;
-  string addr = 2;
-  string name = 3;
-  RAFT_SERVER_LSTATE lstate = 4;
+  int32 id = 1;                     // id
+  string addr = 2;                  // ip:port of node
+  string name = 3;                  // name
+  int32 partition_count = 4;        // partition count of raft node, default is 1
+  RAFT_SERVER_LSTATE lstate = 5;
 };
 
 enum RAFT_SERVER_OPERATION {
@@ -205,14 +206,15 @@ message QueryAllRaftServerNodeResponse {
   int32 ret_code = 1;
   string res_info = 2;
 
-  repeated ServerNode node_list = 4;
+  repeated ServerNode node_list = 3;
 };
 
 
 message RunCharonRequest {
   REQUEST_ORIGIN origin = 1;
   int32 delay = 2;
-  ServerNode server_nodes = 3;
+  int32 set_node_id = 3;
+  repeated ServerNode server_nodes = 4;
 
 };
 

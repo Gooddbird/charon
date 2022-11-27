@@ -36,36 +36,7 @@ RaftPartition::RaftPartition() {
   m_state = EN_RAFT_STATE_FOLLOWER;
   std::string local_addr = tinyrpc::GetServer()->getLocalAddr()->toString();
 
-  TiXmlElement* node =  tinyrpc::GetConfig()->getXmlNode("raft");
-  // assert(node != NULL);
-  // TiXmlElement* groups_node = node->FirstChildElement("raft_servers"); 
-  // int id = 1;
-  // for (TiXmlElement* xmlnode = groups_node->FirstChildElement(); xmlnode!= NULL; xmlnode = xmlnode->NextSiblingElement()) {
-  //   KVMap raft_node;
-  //   std::string addr = std::string(xmlnode->Attribute("addr"));
-  //   raft_node["addr"] = addr;
-
-  //   std::string node_name = std::to_string(id) + "-" + std::to_string(tinyrpc::IOThread::GetCurrentIOThread()->getThreadIndex() + 1);
-  //   raft_node["name"] =  node_name;
-  //   raft_node["id"] = id;
-
-  //   InfoLog << "read raft server conf[" << addr << ", " << node_name << "]";
-
-  //   if (addr == local_addr) {
-  //     m_id = id;
-  //     m_addr = addr;
-  //     m_name = node_name;
-  //     InfoLog << "my local raft node conf[" << addr << ", " << node_name << "]";
-  //   }
-  //   m_nodes[id].swap(raft_node);
-  //   m_match_indexs.push_back(0);
-  //   m_next_indexs.push_back(0);
-  //   id++;
-  //   m_node_count++;
-  // }
-
-  TiXmlElement* conf_node = node->FirstChildElement("raft_conf");
-  assert(conf_node);
+  TiXmlElement* conf_node =  tinyrpc::GetConfig()->getXmlNode("raft")->FirstChildElement("raft_conf");
   m_elect_overtime = std::atoi(conf_node->FirstChildElement("elect_timeout")->GetText());
   m_heart_interval = std::atoi(conf_node->FirstChildElement("heart_interval")->GetText());
 
@@ -311,10 +282,10 @@ int RaftPartition::AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequ
     std::shared_ptr<AskVoteRequest> request = rpc_list[i].first;
     std::shared_ptr<AskVoteResponse> response = rpc_list[i].second;
     int id = request->peer_id();
-    KVMap server_node = RaftNode::GetRaftNode()->getServerNode(id); 
-    printf("id=%d, addr is %s \n", id, server_node["addr"].c_str());
+    ServerNode server_node = RaftNode::GetRaftNode()->getServerNode(id); 
+    printf("id=%d, addr is %s \n", id, server_node.addr().c_str());
 
-    tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(server_node["addr"]);
+    tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(server_node.addr());
     tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel =
       std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);
     tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
@@ -357,7 +328,7 @@ int RaftPartition::AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequ
     rpc_controller->SetTimeout(2000);
     rpc_channel->saveCallee(rpc_controller, request, response, closure);
     CharonService_Stub stub(rpc_channel.get());
-    AppInfoLog << "AskVote request to raft node["<< server_node["addr"] << ", " << server_node["name"] << "]";
+    AppInfoLog << "AskVote request to raft node[" << server_node.addr() << ", " << server_node.name() << "]";
     stub.AskVote(rpc_controller.get(), request.get(), response.get(), closure.get());
   }
   tinyrpc::Coroutine::Yield();
@@ -382,9 +353,9 @@ int RaftPartition::AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<Ap
     std::shared_ptr<AppendLogEntriesRequest> request = rpc_list[i].first;
     std::shared_ptr<AppendLogEntriesResponse> response = rpc_list[i].second;
     int id = request->peer_id();
-    KVMap server_node = RaftNode::GetRaftNode()->getServerNode(id);
-    printf("id=%d, addr is %s \n", id, server_node["addr"].c_str());
-    tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(server_node["addr"]);
+    ServerNode server_node = RaftNode::GetRaftNode()->getServerNode(id);
+    printf("id=%d, addr is %s \n", id, server_node.addr().c_str());
+    tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(server_node.addr());
     tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel =
       std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);
     tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
@@ -432,7 +403,7 @@ int RaftPartition::AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<Ap
     rpc_controller->SetTimeout(2000);
     rpc_channel->saveCallee(rpc_controller, request, response, closure);
     CharonService_Stub stub(rpc_channel.get());
-    AppInfoLog << "AppendLogEntries request to raft node["<< server_node["addr"] << ", " << server_node["name"] << "]";
+    AppInfoLog << "AppendLogEntries request to raft node["<< server_node.addr() << ", " << server_node.name() << "]";
     stub.AppendLogEntries(rpc_controller.get(), request.get(), response.get(), closure.get());
   }
   tinyrpc::Coroutine::Yield();

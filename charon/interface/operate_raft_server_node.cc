@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "tinyrpc/comm/log.h"
+#include "tinyrpc/net/net_address.h"
 #include "charon/interface/operate_raft_server_node.h"
 #include "charon/pb/charon.pb.h"
 #include "charon/comm/business_exception.h"
@@ -46,22 +47,22 @@ void OperateRaftServerNodeInterface::run() {
 
   dispatchOperator();
 
+  setOutputParam();
+
 }
 
 
 void OperateRaftServerNodeInterface::checkInputParam() {
   if (m_request.option() == EN_RAFT_SERVER_OPERATION_UNDEFINE) {
-    throw BusinessException(ERR_PARAM_INPUT, "invalid option:" + std::to_string(m_request.option()));
+    throw BusinessException(ERR_PARAM_INPUT, "invalid option:" + std::to_string(m_request.option()), __FILE__, __LINE__);
   }
 
   m_option = m_request.option();
 
+}
 
-  // if (inet_addr(m_request.server_addr().c_str()) == INADDR_NONE) {
-  //   std::string errinfo =  formatString("checkInputParam error, invalid addr:[%s]", m_request.server_addr().c_str());
-  //   AppErrorLog << errinfo;
-  //   throw BusinessException(ERR_PARAM_INPUT, errinfo);
-  // }
+
+void OperateRaftServerNodeInterface::setOutputParam() {
 
 }
 
@@ -84,15 +85,15 @@ void OperateRaftServerNodeInterface::dispatchOperator() {
       break;
     
     default:
-      throw BusinessException(ERR_PARAM_INPUT, "invalid option:" + std::to_string(m_option));
+      throw BusinessException(ERR_PARAM_INPUT, "invalid option:" + std::to_string(m_option), __FILE__, __LINE__);
   }
 }
 
 void OperateRaftServerNodeInterface::checkAddrInvalid(const std::string& addr) {
-  if (inet_addr(addr.c_str()) == INADDR_NONE) {
+  if (!tinyrpc::IPAddress::CheckValidIPAddr(addr)) {
     std::string errinfo = formatString("checkInputParam error, invalid addr:[%s]", addr.c_str());
     AppErrorLog << errinfo;
-    throw BusinessException(ERR_PARAM_INPUT, errinfo);
+    throw BusinessException(ERR_PARAM_INPUT, errinfo, __FILE__, __LINE__);
   }
 }
 
@@ -104,7 +105,7 @@ void OperateRaftServerNodeInterface::dealOperatorAdd() {
 
   RaftNode::GetRaftNode()->addRaftServerNode(node);
 
-  m_response.set_allocated_node(&node);
+  m_response.mutable_node()->CopyFrom(node);
 
 }
 
@@ -114,7 +115,8 @@ void OperateRaftServerNodeInterface::dealOperatorUpdate() {
   checkAddrInvalid(node.addr());
 
   RaftNode::GetRaftNode()->updateRaftServerNode(node);
-  m_response.set_allocated_node(&node);
+
+  m_response.mutable_node()->CopyFrom(node);
 
 }
 
@@ -123,8 +125,7 @@ void OperateRaftServerNodeInterface::dealOperatorQuery() {
 
   RaftNode::GetRaftNode()->queryRaftServerNode(node);
 
-  m_response.set_allocated_node(&node);
-
+  m_response.mutable_node()->CopyFrom(node);
 }
 
 void OperateRaftServerNodeInterface::dealOperatorDelete() {
@@ -132,7 +133,7 @@ void OperateRaftServerNodeInterface::dealOperatorDelete() {
   
   RaftNode::GetRaftNode()->deleteRaftServerNode(node);
 
-  m_response.set_allocated_node(&node);
+  m_response.mutable_node()->CopyFrom(node);
 
 }
 

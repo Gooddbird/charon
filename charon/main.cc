@@ -31,10 +31,10 @@ int main(int argc, char* argv[]) {
 
   REGISTER_SERVICE(charon::CharonServiceImpl);
 
-  auto cb = []() {
-    charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
-  };
-  tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToEachThread(cb);
+  // auto cb = []() {
+  //   charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
+  // };
+  // tinyrpc::GetServer()->getIOThreadPool()->addCoroutineToEachThread(cb);
 
 
   tinyrpc::StartRpcServer();
