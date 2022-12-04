@@ -56,7 +56,7 @@ void QueryAllRaftServerNodeInterface::setOutputParam() {
 
 void QueryAllRaftServerNodeInterface::queryAllRaftServer() {
   std::vector<ServerNode> node_list;
-  RaftNode::GetRaftNode()->queryAllRaftServerNode(node_list);
+  RaftNode::GetRaftNode()->queryAllRaftServerNode(m_request, node_list);
 
   *m_response.mutable_node_list() = {node_list.begin(), node_list.end()};
 

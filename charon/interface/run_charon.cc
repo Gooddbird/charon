@@ -68,29 +68,92 @@ void RunCharonInterface::handle() {
   }
 }
 
+
+//
+// This function to deal request from outside client, such test_charon_client send a RunCharon cmd
+// 
 void RunCharonInterface::handleRequestFromClient() {
+  QueryAllRaftServerNodeRequest req;
+  req.set_lstate(EN_RAFT_LSTATE_ACTIVE);
   std::vector<ServerNode> list;
-  RaftNode::GetRaftNode()->queryAllRaftServerNode(list);
+  RaftNode::GetRaftNode()->queryAllRaftServerNode(req, list);
 
   if (list.empty()) {
     throw BusinessException(ERR_EMPTY_RAFTNODES, "raft server node list is empty!", __FILE__, __LINE__); 
   }
 
   if (list.size() == 1) {
-    AppDebugLog << "Only set one raft node: ";
+    AppDebugLog << "Only set one raft node: " << RaftNode::RaftServerNodeToString(list[0]);
+    return;
   }
 
+  std::vector<tinyrpc::TinyPbRpcAsyncChannel::ptr> channels;
 
-  // std::shared_ptr<RunCharonRequest> req = std::make_shared<RunCharonRequest>();
-  // std::shared_ptr<RunCharonResponse> rsp = std::make_shared<RunCharonResponse>();
-  // tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(server_node["addr"]);
+  for (auto& node : list) {
+    std::shared_ptr<RunCharonRequest> req = std::make_shared<RunCharonRequest>();
+    std::shared_ptr<RunCharonResponse> rsp = std::make_shared<RunCharonResponse>();
 
-  // tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel = std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);
+    tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(node.addr());
+    tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel = std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);
+    channels.push_back(rpc_channel);
+    tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
+
+    req->set_set_node_id(node.id());
+    *req->mutable_server_nodes() = {list.begin(), list.end()};
+    rpc_channel->saveCallee(rpc_controller, req, rsp, nullptr);
+
+    std::shared_ptr<CharonService_Stub> stub = std::make_shared<CharonService_Stub>(rpc_channel.get());
+
+    stub->RunCharon(rpc_controller.get(), req.get(), rsp.get(), NULL);
+
+  }
+
+  for (auto& i : channels) {
+    i->wait();
+
+    RunCharonRequest* req = dynamic_cast<RunCharonRequest*>(i->getRequestPtr());
+    RunCharonResponse* rsp = dynamic_cast<RunCharonResponse*>(i->getResponsePtr());
+    if (req == nullptr || rsp == nullptr) {
+      AppErrorLog << "system exception when call rpc";
+      throw BusinessException(ERR_RPC_EXCEPTION, "system exception when call rpc", __FILE__, __LINE__); 
+    }
+
+    tinyrpc::TinyPbRpcController* controller = dynamic_cast<tinyrpc::TinyPbRpcController*>(i->getControllerPtr());
+    if (controller== nullptr) {
+      AppErrorLog << "system exception when call rpc";
+      throw BusinessException(ERR_RPC_EXCEPTION, "system exception when call rpc", __FILE__, __LINE__); 
+    }
+
+    if (controller->ErrorCode() != 0) {
+      throw BusinessException(ERR_RPC_EXCEPTION, "call rpc error, error code=" + std::to_string(controller->ErrorCode()), __FILE__, __LINE__); 
+    }
+
+    if (rsp->ret_code() != 0) {
+      throw BusinessException(rsp->ret_code(), formatString("call RunCharon error, errcode=%d, errinfo=%s", rsp->ret_code(), rsp->res_info()), __FILE__, __LINE__); 
+    }
+  }
+  // only all servers return OK, that means this raft run succ, and then some nodes has already begin to elecute
+
+  return;
 }
 
+//
+// This function to deal request from others raft server node, for sync raft node list info
+//
 void RunCharonInterface::handleRequestFromRaftNode() {
+  std::vector<ServerNode> new_node_list;
+  for (int i = 0; i < m_request.server_nodes_size(); ++i) {
+    new_node_list.push_back(m_request.server_nodes().Get(i));
+  }
+  if (new_node_list.empty()) {
+    throw BusinessException(ERR_PARAM_INPUT, "sync node list is empty", __FILE__, __LINE__);
+  }
 
+  RaftNode::GetRaftNode()->resetNodes(new_node_list);
+  RaftNode::GetRaftNode()->setSelfId(m_request.set_node_id());
 
 }
+
+
 
 }

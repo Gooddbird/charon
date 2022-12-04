@@ -46,11 +46,15 @@ RaftPartition::~RaftPartition() {
 
 }
 
+void RaftPartition::setSelfId(int id) {
+  m_self_id = id;
+}
+
 void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse& response) {
   response.set_term(m_current_term);
   response.set_accept_result(EN_ACCEPT_FAIL);
   response.set_vote_fail_code(0);
-  response.set_id(m_id);
+  response.set_id(m_self_id);
   response.set_name(m_name);
   response.set_addr(m_addr);
   response.set_state(m_state);
@@ -98,7 +102,7 @@ void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse
 
   } else if (m_voted_for_id == request.id()) {
     is_vote = true;
-  } else if (m_voted_for_id == m_id) {
+  } else if (m_voted_for_id == m_self_id) {
     std::string reason = formatString("[Term: %d, state: %s, addr: %s, name: %s] has already vote to self",
       m_current_term, RaftNode::StateToString(m_state).c_str(), m_addr.c_str(), m_name.c_str());
 
@@ -122,7 +126,7 @@ void RaftPartition::handleAppendLogEntries(const AppendLogEntriesRequest& reques
   response.set_accept_result(EN_ACCEPT_FAIL);
   response.set_term(m_current_term);
   response.set_append_fail_code(0);
-  response.set_id(m_id);
+  response.set_id(m_self_id);
   response.set_name(m_name);
   response.set_addr(m_addr);
   response.set_state(m_state);
@@ -186,25 +190,25 @@ int RaftPartition::applyToStateMachine(const LogEntry& logs) {
 int RaftPartition::appendLogEntries() {
   if (m_state != EN_RAFT_STATE_LEADER) {
     AppErrorLog << formatString("[Term: %d][%s - %d - %s] current raft node state isn't LEADER, can't appendLogEntries",
-      m_current_term, m_addr.c_str(), m_id, m_name.c_str());
+      m_current_term, m_addr.c_str(), m_self_id, m_name.c_str());
     return -1;
   }
   std::vector<std::pair<std::shared_ptr<AppendLogEntriesRequest>, std::shared_ptr<AppendLogEntriesResponse>>> rpc_list;
   for (int i = 1; i <= RaftNode::GetRaftNode()->getNodeCount(); ++i) {
-    if ((int)i == m_id) {
+    if (i == m_self_id) {
       continue;
     }
     std::shared_ptr<AppendLogEntriesRequest> request = std::make_shared<AppendLogEntriesRequest>();
     std::shared_ptr<AppendLogEntriesResponse> response = std::make_shared<AppendLogEntriesResponse>();
 
     request->set_leader_term(m_current_term);
-    request->set_leader_id(m_id);
+    request->set_leader_id(m_self_id);
 
     int last_index = m_logs.size() - 1;
  
     request->set_peer_id(i);
     request->set_leader_commit_index(m_commit_index);
-    request->set_id(m_id);
+    request->set_id(m_self_id);
     request->set_addr(m_addr);
     request->set_name(m_name);
 
@@ -257,7 +261,7 @@ int RaftPartition::appendLogEntries() {
 void RaftPartition::toFollower(int term) {
   m_coroutine_mutex.lock();
   AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] raft node become to follewer [Term: %d, state: %s]",
-    m_current_term, m_addr.c_str(), m_id, m_name.c_str(), term, RaftNode::StateToString(EN_RAFT_STATE_FOLLOWER).c_str());
+    m_current_term, m_addr.c_str(), m_self_id, m_name.c_str(), term, RaftNode::StateToString(EN_RAFT_STATE_FOLLOWER).c_str());
   m_state = EN_RAFT_STATE_FOLLOWER;
   m_current_term = term;
   m_voted_for_id = 0;
@@ -481,24 +485,24 @@ void RaftPartition::election() {
   // first add current term
   m_current_term++;
   // give vote to self
-  m_voted_for_id = m_id;
+  m_voted_for_id = m_self_id;
 
   RaftPartition* tmp = this;
   m_coroutine_mutex.unlock();
 
   std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>> rpc_list;
   for (int i = 1; i <= RaftNode::GetRaftNode()->getNodeCount(); ++i) {
-    if ((int)i == m_id) {
+    if (i == m_self_id) {
       continue;
     }
     std::shared_ptr<AskVoteRequest> request = std::make_shared<AskVoteRequest>();
     std::shared_ptr<AskVoteResponse> response = std::make_shared<AskVoteResponse>();
 
-    request->set_id(tmp->m_id);
+    request->set_id(tmp->m_self_id);
     request->set_term(tmp->m_current_term);
     request->set_last_log_index(tmp->m_logs.size() - 1);
     request->set_last_log_term(tmp->m_logs[tmp->m_logs.size() - 1].term());
-    request->set_id(tmp->m_id);
+    request->set_id(tmp->m_self_id);
     request->set_addr(tmp->m_addr);
     request->set_name(tmp->m_name);
     request->set_peer_id(i);
@@ -536,7 +540,7 @@ int RaftPartition::execute(const std::string& cmd) {
   log.set_index(last_index);
   log.set_cmd(cmd);
   m_logs.push_back(std::move(log));
-  m_match_indexs[m_id] = log.index();
+  m_match_indexs[m_self_id] = log.index();
 
   int rt = appendLogEntries();
   if (rt != 0) {

@@ -9,7 +9,7 @@
 #include "charon/pb/charon.pb.h"
 
 
-tinyrpc::IPAddress::ptr g_addr = std::make_shared<tinyrpc::IPAddress>("0.0.0.0", 30001);
+tinyrpc::IPAddress::ptr g_addr = nullptr;
 
 void printfLine() {
   int i = 10;
@@ -119,6 +119,10 @@ std::pair<int, std::string> testQueryAllRaftServerNode(const QueryAllRaftServerN
 
 
 void dealAddRaftServerNode(std::vector<std::string>& vec) {
+  if (g_addr == nullptr) {
+    printError("AddRaftServerNode error, please Connect a server node at first");
+    return;
+  }
   if (vec.size() < 3 || vec.size() > 4) {
     printError("AddRaftServerNode args error, usage: AddRaftServerNode name addr [lstate]");
     return;
@@ -160,6 +164,10 @@ void dealUpdateRaftServerNode(std::vector<std::string>& vec) {
 
 
 void dealQueryAllRaftServerNode(std::vector<std::string>& vec) {
+  if (g_addr == nullptr) {
+    printError("QueryAllRaftServerNode error, please Connect a server node at first");
+    return;
+  }
   if (vec.size() > 1) {
     printError("QueryAllRaftServerNode args error, usage: QueryAllRaftServerNode");
     return;
@@ -189,6 +197,21 @@ void dealQueryAllRaftServerNode(std::vector<std::string>& vec) {
 
 }
 
+void dealConnect(std::vector<std::string>& vec) {
+  if (vec.size() != 2) {
+    printError("Connect args error, usage: Connect x.x.x.x:yy");
+    return;
+  }
+  if(!tinyrpc::IPAddress::CheckValidIPAddr(vec[1])) {
+    printError("Invalid network addr " + vec[1]);
+  }
+
+  g_addr = std::make_shared<tinyrpc::IPAddress>(vec[1]);
+
+  printSucc("Success Connect addr " + g_addr->toString());
+
+}
+
 void parseCMD(const std::string& cmd) {
   std::vector<std::string> vec;
   tinyrpc::StringUtil::SplitStrToVector(cmd, " ", vec);
@@ -210,13 +233,17 @@ void parseCMD(const std::string& cmd) {
 
   } else if (option == "QUERYALLRAFTSERVERNODE") {
     dealQueryAllRaftServerNode(vec);
-
+  } else if (option == "CONNECT") {
+    dealConnect(vec);
   } else if (option == "EXIT") {
     printOutput("Now to exit charon client!");
     printfLine();
     exit(0);
   } else {
     printError("Unknown option: " + old_option);
+    // for (int i = 0; i < old_option.length(); ++i) {
+    //   printf("%d ", (int)(old_option[i]));
+    // }
     return;
   }
   
@@ -232,12 +259,15 @@ int main(int argc, char* argv[]) {
   while(1) {
     printInput();
     std::string cmd;
-    // char c = 0;
-    // while(c != 10) {
-    //   c = std::cin.get();
-    //   cmd += c;
-    // }
-    std::cin>>cmd;
+    char c = 0;
+    while(true) {
+      c = std::cin.get();
+      if (c == 10) {
+        break;
+      }
+      cmd += c;
+    }
+    // std::cin>>cmd;
     
     parseCMD(cmd);
   }

@@ -23,9 +23,14 @@ enum ACCEPT_RESULT {
 
 enum RAFT_SERVER_LSTATE {
   EN_RAFT_LSTATE_UNDEFINE = 0;
-  EN_RAFT_LSTATE_ACTIVE = 1;
-  EN_RAFT_LSTATE_DELETED = 2;
+  EN_RAFT_LSTATE_ACTIVE = 1;      // able
+  EN_RAFT_LSTATE_DELETED = 2;     // deleted, can't use
+};
 
+enum RAFT_SERVER_SYNC_STATE {
+  EN_SYNC_STATE_UNDEFINE = 0;
+  EN_SYNC_STATE_INIT = 1;
+  EN_SYNC_STATE_SYNC_FINISHED = 2;
 }
 
 message LogEntry {
@@ -173,6 +178,7 @@ message ServerNode {
   string name = 3;                  // name
   int32 partition_count = 4;        // partition count of raft node, default is 1
   RAFT_SERVER_LSTATE lstate = 5;
+  RAFT_SERVER_SYNC_STATE sync_state = 6;
 };
 
 enum RAFT_SERVER_OPERATION {
@@ -198,7 +204,10 @@ message OperateRaftServerNodeResponse {
 };
 
 message QueryAllRaftServerNodeRequest {
-  optional string client_ip = 1;
+  RAFT_SERVER_LSTATE lstate = 1;
+  RAFT_SERVER_SYNC_STATE sync_state = 2;
+  optional string client_ip = 3;
+
 };
 
 message QueryAllRaftServerNodeResponse {
@@ -212,9 +221,8 @@ message QueryAllRaftServerNodeResponse {
 
 message RunCharonRequest {
   REQUEST_ORIGIN origin = 1;
-  int32 delay = 2;
-  int32 set_node_id = 3;
-  repeated ServerNode server_nodes = 4;
+  int32 set_node_id = 2;
+  repeated ServerNode server_nodes = 3;
 
 };
 

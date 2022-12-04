@@ -3,7 +3,7 @@
   <!--log config-->
   <log>
     <!--identify path of log file-->
-    <log_path>./</log_path>
+    <log_path>../log/</log_path>
     <log_prefix>charon1</log_prefix>
 
     <!--identify max size of single log file, MB-->

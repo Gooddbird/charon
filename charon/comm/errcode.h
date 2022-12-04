@@ -14,6 +14,7 @@ const int ERROR_INVALID_THREAD_HASH = 105;
 
 const int ERR_PARAM_INPUT = 70000001;               // invalid param input 
 const int ERR_EMPTY_RAFTNODES = 70000002;           // not exist raft server nodes
+const int ERR_RPC_EXCEPTION = 70000003;             // call raft server node rpc exception
 
 
 // raft error

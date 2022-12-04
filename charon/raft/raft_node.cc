@@ -11,25 +11,25 @@ namespace charon {
 static RaftNode* g_raft_node = NULL;
 
 RaftNode::RaftNode() {
-  // index 0 is not use, just placeholder 
-  m_server_nodes.push_back(ServerNode());
 
   // default part_count is 1
   m_part_count = 1;
+  m_self_id = 1;
+
   for (int i = 0; i < m_part_count; ++i) {
-    m_partitions.push_back(new RaftPartition());
+    RaftPartition* partition = new RaftPartition();
+    partition->setSelfId(m_self_id);
+    m_partitions.push_back(partition);
   }
 
-  // add self' addr
-  // KVMap raft_node;
   ServerNode node;
-  m_node_count = 1;
+  m_active_node_count = 1;
 
   std::string addr = tinyrpc::GetServer()->getLocalAddr()->toString();
   node.set_addr(addr);
 
   node.set_name("root");
-  node.set_id(m_node_count);
+  node.set_id(1);
   node.set_partition_count(m_part_count);
   node.set_lstate(EN_RAFT_LSTATE_ACTIVE);
 
@@ -39,6 +39,9 @@ RaftNode::RaftNode() {
 }
 
 RaftNode::~RaftNode() {
+
+
+  freePartitions();
 
 }
 
@@ -82,10 +85,9 @@ std::string RaftNode::RaftServerNodeToString(const ServerNode& node) {
 }
 
 RaftNode* RaftNode::GetRaftNode() {
-  if (g_raft_node) {
-    return g_raft_node;
+  if (!g_raft_node) {
+    g_raft_node = new RaftNode();
   }
-  g_raft_node = new RaftNode();
   return g_raft_node;
 }
 
@@ -96,25 +98,30 @@ RaftPartition* RaftNode::getRaftPartition(int hash_id) {
 
 
 int RaftNode::getNodeCount() {
-  return m_node_count;
+  return m_active_node_count;
 }
 
 // get more than half nodes count
 int RaftNode::getMostNodeCount() {
-  return (m_node_count)/2 + 1;
+  return (m_active_node_count)/2 + 1;
 }
 
 const ServerNode& RaftNode::getServerNode(int i) {
-  return m_server_nodes[i];
+  return m_server_nodes[i - 1];
+}
+
+const ServerNode& RaftNode::getSelfNode() {
+  return m_server_nodes[m_self_id - 1];
 }
 
 void RaftNode::addRaftServerNode(ServerNode& node) {
   if (node.name().empty()) {
     throw BusinessException(ERR_PARAM_INPUT, "invalid empty node name", __FILE__, __LINE__);
   }
-
-  m_node_count++;
-  node.set_id(m_node_count);
+  if (node.lstate() == EN_RAFT_LSTATE_ACTIVE) {
+    m_active_node_count++;
+  }
+  node.set_id(m_server_nodes.size() + 1);
   m_server_nodes.push_back(node);
   AppInfoLog << "succ add raft server node: " << RaftServerNodeToString(node);
 
@@ -123,17 +130,26 @@ void RaftNode::addRaftServerNode(ServerNode& node) {
 
 void RaftNode::updateRaftServerNode(ServerNode& node) {
   size_t id = node.id();
-  if (id < 1 || id >= m_server_nodes.size()) {
+  if (id < 1 || id > m_server_nodes.size()) {
     throw BusinessException(ERR_PARAM_INPUT, "invalid server node id:" + std::to_string(id), __FILE__, __LINE__);
   }
 
-  if ((int)id != node.id() || m_server_nodes[id].id() != node.id()) {
+  if (m_server_nodes[id - 1].id() != node.id()) {
     throw BusinessException(ERR_PARAM_INPUT, "change node's id", __FILE__, __LINE__);
   }
 
-  m_server_nodes[id].set_name(node.name());
-  m_server_nodes[id].set_addr(node.addr());
-  m_server_nodes[id].set_lstate(node.lstate());
+  if (m_server_nodes[id - 1].lstate() != EN_RAFT_LSTATE_ACTIVE && node.lstate() == EN_RAFT_LSTATE_ACTIVE) {
+    m_active_node_count++;
+  }
+
+  if (m_server_nodes[id - 1].lstate() == EN_RAFT_LSTATE_ACTIVE && node.lstate() == EN_RAFT_LSTATE_DELETED) {
+    m_active_node_count--;
+  }
+
+  m_server_nodes[id - 1].set_name(node.name());
+  m_server_nodes[id - 1].set_addr(node.addr());
+  m_server_nodes[id - 1].set_lstate(node.lstate());
+
 
   AppInfoLog << "succ update raft server node: " << RaftServerNodeToString(m_server_nodes[id]); 
 }
@@ -144,6 +160,7 @@ void RaftNode::deleteRaftServerNode(ServerNode& node) {
     throw BusinessException(ERR_PARAM_INPUT, "invalid server node id:" + std::to_string(id), __FILE__, __LINE__);
   }
   m_server_nodes[id].set_lstate(EN_RAFT_LSTATE_DELETED);
+  m_active_node_count--;
   AppInfoLog << "succ delete raft server node: " << RaftServerNodeToString(m_server_nodes[id]);
 
 }
@@ -162,12 +179,55 @@ void RaftNode::queryRaftServerNode(ServerNode& node) {
 }
 
 
-void RaftNode::queryAllRaftServerNode(std::vector<ServerNode>& node_list) {
+void RaftNode::queryAllRaftServerNode(const ::QueryAllRaftServerNodeRequest& request, std::vector<ServerNode>& node_list) {
   node_list.clear();
-  node_list = m_server_nodes;
+  RAFT_SERVER_LSTATE lstate = request.lstate();
+  RAFT_SERVER_SYNC_STATE state = request.sync_state();
+
+  for (size_t i = 1; i < m_server_nodes.size(); ++i) {
+    if (lstate != EN_RAFT_LSTATE_UNDEFINE && m_server_nodes[i].lstate() != lstate) {
+      continue;
+    }
+
+    if (state != EN_SYNC_STATE_UNDEFINE && m_server_nodes[i].sync_state() != state) {
+      continue;
+    }
+    node_list.push_back(m_server_nodes[i]);
+  }
 
   AppInfoLog << "succ query all raft server node list ";
 }
 
+
+void RaftNode::resetNodes(std::vector<ServerNode>& new_node_list) {
+  m_server_nodes.swap(new_node_list);
+  if (new_node_list.empty()) {
+    throw BusinessException(ERR_PARAM_INPUT, "sync node list is empty", __FILE__, __LINE__);
+  }
+  setPartitions(new_node_list[0].partition_count());
+}
+
+void RaftNode::setSelfId(int id) {
+  m_self_id = id;
+  for (int i = 0; i < m_part_count; ++i) {
+    m_partitions[i]->setSelfId(m_self_id);
+  }
+}
+
+void RaftNode::setPartitions(int partition_count) {
+  freePartitions();
+  for (int i = 0; i < partition_count; ++i) {
+    m_partitions.push_back(new RaftPartition());
+  }
+  m_part_count = partition_count;
+}
+
+
+void RaftNode::freePartitions() {
+  for (size_t i = 0; i < m_partitions.size(); ++i) {
+    free(m_partitions[i]);
+    m_partitions[i] = NULL;
+  }
+}
 
 }

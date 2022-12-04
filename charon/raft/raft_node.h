@@ -27,6 +27,8 @@ class RaftNode {
 
   const ServerNode& getServerNode(int i);
 
+  const ServerNode& getSelfNode();
+
   void addRaftServerNode(ServerNode& node);
 
   void updateRaftServerNode(ServerNode& node);
@@ -35,7 +37,16 @@ class RaftNode {
 
   void queryRaftServerNode(ServerNode& node);
 
-  void queryAllRaftServerNode(std::vector<ServerNode>& node_list);
+  void queryAllRaftServerNode(const ::QueryAllRaftServerNodeRequest& request, std::vector<ServerNode>& node_list);
+
+  void resetNodes(std::vector<ServerNode>& new_node_list);
+
+  void setSelfId(int id);
+
+  void setPartitions(int partition_count);
+
+ private:
+  void freePartitions();
 
 
  public:
@@ -52,19 +63,13 @@ class RaftNode {
 
 
  private:
-  std::vector<RaftPartition*> m_partitions;
-  int m_part_count {0};
-
-  // node info about all distributed server 
-  // map is used to describe node info
-  // key1: "addr" , value1: "127.0.0.1:19999"
-  // key2: "name", value2: "xxx"
-  // key3: "id", value3: "xxx"
-  // key4: "lstate", value4: 1-active, otherwise deleted
-  // index 0 is undefine, so the first raft server node index is 1
   std::vector<ServerNode> m_server_nodes;
 
-  int m_node_count {0};
+  std::vector<RaftPartition*> m_partitions;
+
+  int m_active_node_count {0};
+  int m_part_count {0};
+  int m_self_id {0};
 
 };
 

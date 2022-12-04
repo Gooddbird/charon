@@ -41,6 +41,8 @@ class RaftPartition {
 
   int execute(const std::string& cmd);
 
+  void setSelfId(int id);
+
  public:
   // deal askVote RPC
   void handleAskVote(const AskVoteRequest& request, AskVoteResponse& response);
@@ -104,7 +106,7 @@ class RaftPartition {
  private:
   RAFT_STATE m_state;
 
-  int m_id {0};
+  int m_self_id {0};
   std::string m_name;
   std::string m_addr;
 
