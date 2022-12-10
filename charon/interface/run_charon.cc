@@ -73,6 +73,8 @@ void RunCharonInterface::handle() {
 // This function to deal request from outside client, such test_charon_client send a RunCharon cmd
 // 
 void RunCharonInterface::handleRequestFromClient() {
+
+  AppDebugLog << "handleRequestFromClient begin";
   QueryAllRaftServerNodeRequest req;
   req.set_lstate(EN_RAFT_LSTATE_ACTIVE);
   std::vector<ServerNode> list;
@@ -102,6 +104,7 @@ void RunCharonInterface::handleRequestFromClient() {
     tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel = std::make_shared<tinyrpc::TinyPbRpcAsyncChannel>(addr);
     channels.push_back(rpc_channel);
     tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
+    rpc_controller->SetTimeout(1000);
 
     req->set_set_node_id(node.id());
     req->set_origin(EN_REQUEST_FORM_RAFTNODE);
@@ -131,7 +134,7 @@ void RunCharonInterface::handleRequestFromClient() {
     }
 
     if (controller->ErrorCode() != 0) {
-      throw BusinessException(ERR_RPC_EXCEPTION, "call rpc error, error code=" + std::to_string(controller->ErrorCode()), __FILE__, __LINE__); 
+      throw BusinessException(ERR_RPC_EXCEPTION, formatString("call rpc error, error code=%d, errinfo=%s", controller->ErrorCode(), controller->ErrorText().c_str()), __FILE__, __LINE__); 
     }
 
     if (rsp->ret_code() != 0) {
@@ -140,6 +143,10 @@ void RunCharonInterface::handleRequestFromClient() {
   }
   // only all servers return OK, that means this raft run succ, and then some nodes has already begin to elecute
 
+  // now directly start election
+  // charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
+
+  AppDebugLog << "handleRequestFromClient end";
   return;
 }
 
@@ -147,6 +154,8 @@ void RunCharonInterface::handleRequestFromClient() {
 // This function to deal request from others raft server node, for sync raft node list info
 //
 void RunCharonInterface::handleRequestFromRaftNode() {
+
+  AppDebugLog << "handleRequestFromRaftNode begin";
   std::vector<ServerNode> new_node_list;
   for (int i = 0; i < m_request.server_nodes_size(); ++i) {
     new_node_list.push_back(m_request.server_nodes().Get(i));
@@ -158,8 +167,21 @@ void RunCharonInterface::handleRequestFromRaftNode() {
   RaftNode::GetRaftNode()->resetNodes(new_node_list);
   RaftNode::GetRaftNode()->setSelfId(m_request.set_node_id());
 
+  startRaft();
+
+  AppDebugLog << "handleRequestFromRaftNode end";
 }
 
 
+void RunCharonInterface::startRaft() {
+  // 1. sleep random time
+  // because other nodes maybe not init finished
+  sleep(1);
+
+  AppDebugLog << "sleep end";
+  // 2. start election
+  // charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
+
+}
 
 }

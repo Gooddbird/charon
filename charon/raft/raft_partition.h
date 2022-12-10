@@ -43,6 +43,8 @@ class RaftPartition {
 
   void setSelfId(int id);
 
+  void initTimerEvent();
+
  public:
   // deal askVote RPC
   void handleAskVote(const AskVoteRequest& request, AskVoteResponse& response);

@@ -42,6 +42,8 @@ class RunCharonInterface {
 
   void handleRequestFromRaftNode();
 
+  void startRaft();
+
  private:
   const ::RunCharonRequest& m_request;      // request object fron client
 

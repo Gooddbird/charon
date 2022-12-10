@@ -40,10 +40,18 @@ RaftPartition::RaftPartition() {
   m_elect_overtime = std::atoi(conf_node->FirstChildElement("elect_timeout")->GetText());
   m_heart_interval = std::atoi(conf_node->FirstChildElement("heart_interval")->GetText());
 
+  initTimerEvent();
+
 }
 
 RaftPartition::~RaftPartition() {
+  if (m_appendlog_event) {
+    tinyrpc::Reactor::GetReactor()->getTimer()->delTimerEvent(m_appendlog_event);
+  }
 
+  if (m_elect_overtime) {
+    tinyrpc::Reactor::GetReactor()->getTimer()->delTimerEvent(m_election_event);
+  }
 }
 
 void RaftPartition::setSelfId(int id) {
@@ -427,55 +435,46 @@ void RaftPartition::setState(RAFT_STATE state) {
   m_state = state;
 }
 
+void RaftPartition::initTimerEvent() {
+  m_election_event = 
+    std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, false, [this]() mutable {
+      // start a new coroutine to make election
+      tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
+      cor->setCallBack(
+        [this]() {
+          election();
+        }
+      );
+      tinyrpc::Coroutine::Resume(cor.get());
+  });
+
+  // tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_election_event);
+  // m_election_event->cancle();
+
+  m_appendlog_event = 
+    std::make_shared<tinyrpc::TimerEvent>(m_heart_interval, true, [this]() mutable {
+      tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
+      cor->setCallBack(
+        [this]() {
+          appendLogEntries();
+      });
+      tinyrpc::Coroutine::Resume(cor.get());
+    });
+
+  // tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_appendlog_event);
+  // m_appendlog_event->cancle();
+}
 
 void RaftPartition::resetElectionTimer() {
-  if (!m_election_event) {
-    tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
-    cor->setCallBack(
-      [this]() {
-          election();
-      }
-    );
-    m_election_event = 
-      std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, false, [cor]() mutable {
-        auto t = cor.get();
-        cor.reset();
-        tinyrpc::Coroutine::Resume(t);
-      });
-
-    tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_election_event);
-  } else {
-    m_election_event->cancle();
-    m_election_event->resetTime();
-  }
-  
+  m_election_event->resetTime();
 }
 
 void RaftPartition::startAppendLogHeart() {
-  if (!m_appendlog_event) {
-    tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
-    cor->setCallBack(
-      [this]() {
-        appendLogEntries();
-      }
-    );
-
-    m_appendlog_event = 
-      std::make_shared<tinyrpc::TimerEvent>(m_heart_interval, true, [cor]() mutable {
-        auto t = cor.get();
-        cor.reset();
-        tinyrpc::Coroutine::Resume(t);
-      });
-
-    tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_appendlog_event);
-  }
   m_appendlog_event->wake();
 }
 
 void RaftPartition::stopAppendLogHeart() {
-  if (m_appendlog_event) {
-    m_appendlog_event->cancle();
-  }
+  m_appendlog_event->cancle();
 }
 
 void RaftPartition::election() {
@@ -502,7 +501,6 @@ void RaftPartition::election() {
     request->set_term(tmp->m_current_term);
     request->set_last_log_index(tmp->m_logs.size() - 1);
     request->set_last_log_term(tmp->m_logs[tmp->m_logs.size() - 1].term());
-    request->set_id(tmp->m_self_id);
     request->set_addr(tmp->m_addr);
     request->set_name(tmp->m_name);
     request->set_peer_id(i);
