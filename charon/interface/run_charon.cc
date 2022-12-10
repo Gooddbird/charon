@@ -90,6 +90,11 @@ void RunCharonInterface::handleRequestFromClient() {
   std::vector<tinyrpc::TinyPbRpcAsyncChannel::ptr> channels;
 
   for (auto& node : list) {
+    if (node.id() == RaftNode::GetRaftNode()->getSelfNode().id()) {
+      // skip self
+      continue;
+    }
+
     std::shared_ptr<RunCharonRequest> req = std::make_shared<RunCharonRequest>();
     std::shared_ptr<RunCharonResponse> rsp = std::make_shared<RunCharonResponse>();
 
@@ -99,6 +104,7 @@ void RunCharonInterface::handleRequestFromClient() {
     tinyrpc::TinyPbRpcController::ptr rpc_controller = std::make_shared<tinyrpc::TinyPbRpcController>();
 
     req->set_set_node_id(node.id());
+    req->set_origin(EN_REQUEST_FORM_RAFTNODE);
     *req->mutable_server_nodes() = {list.begin(), list.end()};
     rpc_channel->saveCallee(rpc_controller, req, rsp, nullptr);
 
@@ -129,7 +135,7 @@ void RunCharonInterface::handleRequestFromClient() {
     }
 
     if (rsp->ret_code() != 0) {
-      throw BusinessException(rsp->ret_code(), formatString("call RunCharon error, errcode=%d, errinfo=%s", rsp->ret_code(), rsp->res_info()), __FILE__, __LINE__); 
+      throw BusinessException(rsp->ret_code(), formatString("call RunCharon error, errcode=%d, errinfo=%s", rsp->ret_code(), rsp->res_info().c_str()), __FILE__, __LINE__); 
     }
   }
   // only all servers return OK, that means this raft run succ, and then some nodes has already begin to elecute

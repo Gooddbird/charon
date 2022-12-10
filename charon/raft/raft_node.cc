@@ -39,10 +39,7 @@ RaftNode::RaftNode() {
 }
 
 RaftNode::~RaftNode() {
-
-
   freePartitions();
-
 }
 
 std::string RaftNode::StateToString(const RAFT_STATE& state) {
@@ -184,7 +181,7 @@ void RaftNode::queryAllRaftServerNode(const ::QueryAllRaftServerNodeRequest& req
   RAFT_SERVER_LSTATE lstate = request.lstate();
   RAFT_SERVER_SYNC_STATE state = request.sync_state();
 
-  for (size_t i = 1; i < m_server_nodes.size(); ++i) {
+  for (size_t i = 0; i < m_server_nodes.size(); ++i) {
     if (lstate != EN_RAFT_LSTATE_UNDEFINE && m_server_nodes[i].lstate() != lstate) {
       continue;
     }
@@ -228,6 +225,7 @@ void RaftNode::freePartitions() {
     free(m_partitions[i]);
     m_partitions[i] = NULL;
   }
+  m_partitions.clear();
 }
 
 }

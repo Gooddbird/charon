@@ -56,65 +56,57 @@ std::string lstateToString(RAFT_SERVER_LSTATE state) {
   } else if (state == EN_RAFT_LSTATE_DELETED) {
     return "Deleted";
   } else {
-    return "Undefine error state";
+    return "Undefine state";
+  }
+}
+
+std::string syncstateToString(RAFT_SERVER_SYNC_STATE state) {
+  if (state == EN_SYNC_STATE_INIT) {
+    return "Init";
+  } else if (state == EN_SYNC_STATE_SYNC_FINISHED) {
+    return "Sync Finished";
+  } else {
+    return "Undefine sync state";
   }
 }
 
 std::string serverNodeToString(const ServerNode& node) {
   std::stringstream ss;
-  ss << "{\"node_id\": " << node.id()
-    << ", \"node_name\": \"" << node.name() << "\""
-    << ", \"node_addr\": \"" << node.addr() << "\"" 
-    << ", \"node_state\": \"" << lstateToString(node.lstate()) << "\"" 
+  ss << "{\"id\": " << node.id()
+    << ", \"name\": \"" << node.name() << "\""
+    << ", \"addr\": \"" << node.addr() << "\"" 
+    << ", \"partition count\": \"" << node.partition_count() << "\"" 
+    << ", \"lstate\": \"" << lstateToString(node.lstate()) << "\"" 
+    << ", \"sync state\": \"" << syncstateToString(node.sync_state()) << "\"" 
     << "}";
 
   return ss.str();
 }
 
+#define CALL_TINYRPC(METHOD_NAME) \
+  tinyrpc::TinyPbRpcChannel channel(g_addr); \
+  CharonService_Stub stub(&channel);  \
+  tinyrpc::TinyPbRpcController rpc_controller; \
+  rpc_controller.SetTimeout(5000);  \
+  stub.METHOD_NAME(&rpc_controller, &request, &response, NULL); \
+  if (rpc_controller.ErrorCode() != 0) { \
+    return std::make_pair(rpc_controller.ErrorCode(), rpc_controller.ErrorText()); \
+  } \
+  return std::make_pair(0, "OK"); \
 
 
-std::pair<int, std::string> testOperateRaftServerNode(const OperateRaftServerNodeRequest& requeset, OperateRaftServerNodeResponse& response) {
-
-  tinyrpc::TinyPbRpcChannel channel(g_addr);
-  CharonService_Stub stub(&channel);
-
-  tinyrpc::TinyPbRpcController rpc_controller;
-  rpc_controller.SetTimeout(5000);
-
-  // std::cout << "Send to tinyrpc server " << addr->toString() << ", requeset body: " << requeset.ShortDebugString() << std::endl;
-  stub.OperateRaftServerNode(&rpc_controller, &requeset, &response, NULL);
-
-  if (rpc_controller.ErrorCode() != 0) {
-    // std::cout << "Failed to call tinyrpc server, error code: " << rpc_controller.ErrorCode() << ", error info: " << rpc_controller.ErrorText() << std::endl; 
-    return std::make_pair(rpc_controller.ErrorCode(), rpc_controller.ErrorText());
-  }
-
-  // std::cout << "Success get response frrom tinyrpc server " << addr->toString() << ", response body: " << response.ShortDebugString() << std::endl;
-
-  return std::make_pair(0, "OK");
+std::pair<int, std::string> testOperateRaftServerNode(const OperateRaftServerNodeRequest& request, OperateRaftServerNodeResponse& response) {
+  CALL_TINYRPC(OperateRaftServerNode);
 }
 
 
 std::pair<int, std::string> testQueryAllRaftServerNode(const QueryAllRaftServerNodeRequest& request, QueryAllRaftServerNodeResponse& response) {
-
-  tinyrpc::TinyPbRpcChannel channel(g_addr);
-  CharonService_Stub stub(&channel);
-
-  tinyrpc::TinyPbRpcController rpc_controller;
-  rpc_controller.SetTimeout(5000);
-
-  // std::cout << "Send to tinyrpc server " << addr->toString() << ", requeset body: " << rpc_req.ShortDebugString() << std::endl;
-  stub.QueryAllRaftServerNode(&rpc_controller, &request, &response, NULL);
-
-  if (rpc_controller.ErrorCode() != 0) {
-    // std::cout << "Failed to call tinyrpc server, error code: " << rpc_controller.ErrorCode() << ", error info: " << rpc_controller.ErrorText() << std::endl; 
-    return std::make_pair(rpc_controller.ErrorCode(), rpc_controller.ErrorText());
-  }
-
-  // std::cout << "Success get response frrom tinyrpc server " << addr->toString() << ", response body: " << rpc_res.ShortDebugString() << std::endl;
-  return std::make_pair(0, "OK");
+  CALL_TINYRPC(QueryAllRaftServerNode);
 }
 
+std::pair<int, std::string> testRunCharon(const RunCharonRequest& request, RunCharonResponse& response) {
+  CALL_TINYRPC(RunCharon);
+}
 
 
 
@@ -160,6 +152,24 @@ void dealAddRaftServerNode(std::vector<std::string>& vec) {
 
 void dealUpdateRaftServerNode(std::vector<std::string>& vec) {
 
+}
+
+void dealRunCharon(std::vector<std::string>& vec) {
+  RunCharonRequest request;
+  RunCharonResponse response;
+
+  request.set_origin(EN_REQUEST_FORM_CLIENT);
+
+  auto res = testRunCharon(request, response);
+  if (res.first != 0) {
+    printError("RunCharon error, framework exception, errinfo: [" + std::to_string(res.first) + ", " + res.second + "]");
+    return;
+  }
+  if (response.ret_code() != 0) {
+    printError("RunCharon error, business exception, errinfo: [" + std::to_string(response.ret_code()) + ", " + response.res_info()+ "]");
+    return;
+  }
+  printSucc("RunCharon succ");
 }
 
 
@@ -235,6 +245,8 @@ void parseCMD(const std::string& cmd) {
     dealQueryAllRaftServerNode(vec);
   } else if (option == "CONNECT") {
     dealConnect(vec);
+  } else if (option == "RUNCHARON") {
+    dealRunCharon(vec);
   } else if (option == "EXIT") {
     printOutput("Now to exit charon client!");
     printfLine();
