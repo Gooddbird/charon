@@ -144,7 +144,7 @@ void RunCharonInterface::handleRequestFromClient() {
   // only all servers return OK, that means this raft run succ, and then some nodes has already begin to elecute
 
   // now directly start election
-  // charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
+  charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
 
   AppDebugLog << "handleRequestFromClient end";
   return;
@@ -176,11 +176,11 @@ void RunCharonInterface::handleRequestFromRaftNode() {
 void RunCharonInterface::startRaft() {
   // 1. sleep random time
   // because other nodes maybe not init finished
-  sleep(1);
+  // sleep(1);
 
   AppDebugLog << "sleep end";
   // 2. start election
-  // charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
+  charon::RaftNode::GetRaftNode()->getRaftPartition(0)->resetElectionTimer();
 
 }
 

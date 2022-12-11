@@ -24,7 +24,7 @@
 
 void test_client() {
 
-  tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>("0.0.0.0", 39999);
+  tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>("0.0.0.0", 30001);
 
   tinyrpc::TinyPbRpcChannel channel(addr);
   CharonService_Stub stub(&channel);

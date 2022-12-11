@@ -8,16 +8,6 @@
 #include "tinyrpc/net/mutex.h"
 #include "tinyrpc/net/timer.h"
 
-
-// raft errcode define
-// #define ERR_TERM_MORE_THAN_LEADER 80000001        // current term more than leader' term
-// #define ERR_NOT_MATCH_PREINDEX 80000002           // can't find a log match prev_log_index & prev_log_term
-// #define ERR_LOG_MORE_THAN_CANDIDATE 80000003      // current log is more new than candidate
-// #define ERR_TERM_MORE_THAN_CANDICATE 80000004     // current term more than leader' term
-// #define ERR_ALREADY_VOTED 80000005               // current term node has already voted 
-
-
-
 namespace charon {
 
 class RaftNode;
@@ -41,9 +31,7 @@ class RaftPartition {
 
   int execute(const std::string& cmd);
 
-  void setSelfId(int id);
-
-  void initTimerEvent();
+  void initNodeInfo(const int& self_id, const std::string& name, const std::string& addr);
 
  public:
   // deal askVote RPC
@@ -74,6 +62,10 @@ class RaftPartition {
   void updateMatchIndex(const int& node_id, const int& v);
 
   void toFollower(int term);
+
+  tinyrpc::TimerEvent::ptr getElectionTimerEvent();
+
+  tinyrpc::TimerEvent::ptr getAppendLogTimerEvent();
 
  public:
   void lock();

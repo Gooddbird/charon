@@ -16,26 +16,29 @@ RaftNode::RaftNode() {
   m_part_count = 1;
   m_self_id = 1;
 
-  for (int i = 0; i < m_part_count; ++i) {
-    RaftPartition* partition = new RaftPartition();
-    partition->setSelfId(m_self_id);
-    m_partitions.push_back(partition);
-  }
-
   ServerNode node;
   m_active_node_count = 1;
 
   std::string addr = tinyrpc::GetServer()->getLocalAddr()->toString();
+  std::string name = "root";
   node.set_addr(addr);
 
-  node.set_name("root");
+  node.set_name(name);
   node.set_id(1);
   node.set_partition_count(m_part_count);
   node.set_lstate(EN_RAFT_LSTATE_ACTIVE);
+  node.set_sync_state(EN_SYNC_STATE_SYNC_FINISHED);
 
   AppInfoLog << "init root raft server node " << RaftServerNodeToString(node);
 
   m_server_nodes.emplace_back(node);
+
+  for (int i = 0; i < m_part_count; ++i) {
+    RaftPartition* partition = new RaftPartition();
+    partition->initNodeInfo(m_self_id, name, addr);
+    m_partitions.push_back(partition);
+  }
+
 }
 
 RaftNode::~RaftNode() {
@@ -206,8 +209,9 @@ void RaftNode::resetNodes(std::vector<ServerNode>& new_node_list) {
 
 void RaftNode::setSelfId(int id) {
   m_self_id = id;
+  const ServerNode& node = getServerNode(m_self_id);
   for (int i = 0; i < m_part_count; ++i) {
-    m_partitions[i]->setSelfId(m_self_id);
+    m_partitions[i]->initNodeInfo(m_self_id, node.name(), node.addr());
   }
 }
 

@@ -40,8 +40,6 @@ RaftPartition::RaftPartition() {
   m_elect_overtime = std::atoi(conf_node->FirstChildElement("elect_timeout")->GetText());
   m_heart_interval = std::atoi(conf_node->FirstChildElement("heart_interval")->GetText());
 
-  initTimerEvent();
-
 }
 
 RaftPartition::~RaftPartition() {
@@ -54,8 +52,10 @@ RaftPartition::~RaftPartition() {
   }
 }
 
-void RaftPartition::setSelfId(int id) {
-  m_self_id = id;
+void RaftPartition::initNodeInfo(const int& self_id, const std::string& name, const std::string& addr) {
+  m_self_id = self_id;
+  m_addr = addr;
+  m_name = name;
 }
 
 void RaftPartition::handleAskVote(const AskVoteRequest& request, AskVoteResponse& response) {
@@ -269,7 +269,7 @@ int RaftPartition::appendLogEntries() {
 void RaftPartition::toFollower(int term) {
   m_coroutine_mutex.lock();
   AppErrorLog << formatString("[Term: %d, state: %s, addr: %s, name: %s] raft node become to follewer [Term: %d, state: %s]",
-    m_current_term, m_addr.c_str(), m_self_id, m_name.c_str(), term, RaftNode::StateToString(EN_RAFT_STATE_FOLLOWER).c_str());
+    m_current_term, RaftNode::StateToString(m_state).c_str(), m_addr.c_str(), m_name.c_str(), term, RaftNode::StateToString(EN_RAFT_STATE_FOLLOWER).c_str());
   m_state = EN_RAFT_STATE_FOLLOWER;
   m_current_term = term;
   m_voted_for_id = 0;
@@ -286,16 +286,12 @@ int RaftPartition::AskVoteRPCs(std::vector<std::pair<std::shared_ptr<AskVoteRequ
   std::atomic_int succ_count {1};
   std::atomic_bool need_resume {true};
 
-  if ((int)(rpc_list.size()) + 1 != RaftNode::GetRaftNode()->getNodeCount()) {
-    AppErrorLog << "AskVoteRPCs Error, rpc_list size is not all nodes count - 1";
-    // return;
-  }
   for (size_t i = 0; i < rpc_list.size(); ++i) {
     std::shared_ptr<AskVoteRequest> request = rpc_list[i].first;
     std::shared_ptr<AskVoteResponse> response = rpc_list[i].second;
     int id = request->peer_id();
     ServerNode server_node = RaftNode::GetRaftNode()->getServerNode(id); 
-    printf("id=%d, addr is %s \n", id, server_node.addr().c_str());
+    AppInfoLog << formatString("call askVote to node[peer id: %d, peer name: %s, peer addr: %s]", id, server_node.name().c_str(), server_node.addr().c_str());
 
     tinyrpc::IPAddress::ptr addr = std::make_shared<tinyrpc::IPAddress>(server_node.addr());
     tinyrpc::TinyPbRpcAsyncChannel::ptr rpc_channel =
@@ -357,10 +353,6 @@ int RaftPartition::AppendLogEntriesRPCs(std::vector<std::pair<std::shared_ptr<Ap
   std::atomic_int succ_count {1};
   std::atomic_bool need_resume {true};
 
-  if ((int)(rpc_list.size()) + 1 != RaftNode::GetRaftNode()->getNodeCount()) {
-    AppErrorLog << "AppendLogEntries Error, rpc_list size is not all nodes count - 1";
-    // return -1;
-  }
   for (size_t i = 0; i < rpc_list.size(); ++i) {
     std::shared_ptr<AppendLogEntriesRequest> request = rpc_list[i].first;
     std::shared_ptr<AppendLogEntriesResponse> response = rpc_list[i].second;
@@ -435,23 +427,30 @@ void RaftPartition::setState(RAFT_STATE state) {
   m_state = state;
 }
 
-void RaftPartition::initTimerEvent() {
-  m_election_event = 
-    std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, false, [this]() mutable {
-      // start a new coroutine to make election
-      tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
-      cor->setCallBack(
-        [this]() {
-          election();
-        }
-      );
-      tinyrpc::Coroutine::Resume(cor.get());
-  });
+void RaftPartition::resetElectionTimer() {
+  if (m_election_event == nullptr) {
+    m_election_event = 
+      std::make_shared<tinyrpc::TimerEvent>(m_elect_overtime, true, [this]() mutable {
+        // start a new coroutine to make election
+        tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
+        cor->setCallBack(
+          [this]() {
+            election();
+          }
+        );
+        tinyrpc::Coroutine::Resume(cor.get());
+    });
+    tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_election_event);
+  } else {
+    m_election_event->resetTime();
+    AppDebugLog << "succ reset election event arrive time = " << m_election_event->m_arrive_time;
+  }
+  AppDebugLog << "next election event will at " << m_election_event->m_arrive_time;
+}
 
-  // tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_election_event);
-  // m_election_event->cancle();
-
-  m_appendlog_event = 
+void RaftPartition::startAppendLogHeart() {
+  if (m_appendlog_event == nullptr) {
+    m_appendlog_event = 
     std::make_shared<tinyrpc::TimerEvent>(m_heart_interval, true, [this]() mutable {
       tinyrpc::Coroutine::ptr cor = tinyrpc::GetCoroutinePool()->getCoroutineInstanse();
       cor->setCallBack(
@@ -460,21 +459,19 @@ void RaftPartition::initTimerEvent() {
       });
       tinyrpc::Coroutine::Resume(cor.get());
     });
-
-  // tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_appendlog_event);
-  // m_appendlog_event->cancle();
-}
-
-void RaftPartition::resetElectionTimer() {
-  m_election_event->resetTime();
-}
-
-void RaftPartition::startAppendLogHeart() {
-  m_appendlog_event->wake();
+    tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_appendlog_event);
+  } else {
+    m_appendlog_event->wake();
+    AppDebugLog << "succ wake up appendLog event";
+  }
+  AppDebugLog << "next appendLog event will at " << m_appendlog_event->m_arrive_time;
 }
 
 void RaftPartition::stopAppendLogHeart() {
-  m_appendlog_event->cancle();
+  if (m_appendlog_event) {
+    m_appendlog_event->cancle();
+    AppDebugLog << "succ calcle appendLog event";
+  }
 }
 
 void RaftPartition::election() {
@@ -486,7 +483,7 @@ void RaftPartition::election() {
   // give vote to self
   m_voted_for_id = m_self_id;
 
-  RaftPartition* tmp = this;
+  RaftPartition tmp(*this);
   m_coroutine_mutex.unlock();
 
   std::vector<std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>> rpc_list;
@@ -497,12 +494,12 @@ void RaftPartition::election() {
     std::shared_ptr<AskVoteRequest> request = std::make_shared<AskVoteRequest>();
     std::shared_ptr<AskVoteResponse> response = std::make_shared<AskVoteResponse>();
 
-    request->set_id(tmp->m_self_id);
-    request->set_term(tmp->m_current_term);
-    request->set_last_log_index(tmp->m_logs.size() - 1);
-    request->set_last_log_term(tmp->m_logs[tmp->m_logs.size() - 1].term());
-    request->set_addr(tmp->m_addr);
-    request->set_name(tmp->m_name);
+    request->set_id(tmp.m_self_id);
+    request->set_term(tmp.m_current_term);
+    request->set_last_log_index(tmp.m_logs.size() - 1);
+    request->set_last_log_term(tmp.m_logs[tmp.m_logs.size() - 1].term());
+    request->set_addr(tmp.m_addr);
+    request->set_name(tmp.m_name);
     request->set_peer_id(i);
 
     rpc_list.emplace_back(std::pair<std::shared_ptr<AskVoteRequest>, std::shared_ptr<AskVoteResponse>>(request, response));
@@ -571,6 +568,14 @@ void RaftPartition::unlock() {
   m_coroutine_mutex.unlock();
 } 
 
+
+tinyrpc::TimerEvent::ptr RaftPartition::getElectionTimerEvent() {
+  return m_election_event;
+}
+
+tinyrpc::TimerEvent::ptr RaftPartition::getAppendLogTimerEvent() {
+  return m_appendlog_event;
+}
 
 
 
