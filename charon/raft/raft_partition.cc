@@ -442,7 +442,9 @@ void RaftPartition::resetElectionTimer() {
     });
     tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_election_event);
   } else {
+    tinyrpc::Reactor::GetReactor()->getTimer()->delTimerEvent(m_election_event);
     m_election_event->resetTime();
+    tinyrpc::Reactor::GetReactor()->getTimer()->addTimerEvent(m_election_event);
     AppDebugLog << "succ reset election event arrive time = " << m_election_event->m_arrive_time;
   }
   AppDebugLog << "next election event will at " << m_election_event->m_arrive_time;

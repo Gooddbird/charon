@@ -20,8 +20,6 @@ class RaftPartition {
 
   ~RaftPartition();
 
-  void FollewerToCandidate();
-
  public:
   void resetElectionTimer();
 
